@@ -9,6 +9,7 @@ import {
 import {
   AnomalyEvent,
   AnomalyType,
+  ChartPeriodMode,
   CountryCode,
   DailyUsageRecord,
   FaultInjection,
@@ -31,6 +32,11 @@ import {
   isOffPeakMinute,
   parseTimeToMinutes,
 } from './billingCalculator';
+import {
+  buildPeriodAnalytics,
+  MIN_MONTHLY_OFFSET,
+  MIN_WEEKLY_OFFSET,
+} from './periodAnalytics';
 
 const WEEK_SECONDS = 7 * 86400;
 // Start Monday 14:30:00 (Day 1 = Mon)
@@ -139,6 +145,13 @@ export function useSimulatorEngine() {
   const [countryCode, setCountryCode] = useState<CountryCode>('ID');
   const [sockets, setSockets] = useState<SocketState[]>(createInitialSockets);
   const [dailyHistory, setDailyHistory] = useState<DailyUsageRecord[]>(INITIAL_DAILY_HISTORY);
+  const [chartPeriodMode, setChartPeriodModeState] = useState<ChartPeriodMode>('weekly');
+  const [periodOffset, setPeriodOffset] = useState<number>(0);
+  const [simulatedDaysElapsed, setSimulatedDaysElapsed] = useState<number>(0);
+  const [completedSimulatedDays, setCompletedSimulatedDays] = useState<
+    Record<number, { s1Kwh: number; s2Kwh: number; s3Kwh: number; s4Kwh: number }>
+  >({});
+  const [referenceDate] = useState<Date>(() => new Date());
   const [isSafetyLocked, setIsSafetyLocked] = useState<boolean>(false);
   const [clockSeconds, setClockSeconds] = useState<number>(INITIAL_CLOCK_SECONDS);
   const [speedMultiplier, setSpeedMultiplier] = useState<SpeedMultiplier>(60);
@@ -175,6 +188,7 @@ export function useSimulatorEngine() {
     schedules,
     tickCount,
     voltageHistory,
+    simulatedDaysElapsed,
   });
 
   stateRef.current = {
@@ -189,6 +203,7 @@ export function useSimulatorEngine() {
     schedules,
     tickCount,
     voltageHistory,
+    simulatedDaysElapsed,
   };
 
   const bannerTimeoutRef = useRef<number | null>(null);
@@ -744,10 +759,30 @@ export function useSimulatorEngine() {
     setSchedules((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
+  const setChartPeriodMode = useCallback((mode: ChartPeriodMode) => {
+    setChartPeriodModeState(mode);
+    setPeriodOffset(0);
+  }, []);
+
+  const stepPeriodOffset = useCallback(
+    (delta: -1 | 1) => {
+      setPeriodOffset((prev) => {
+        const min =
+          chartPeriodMode === 'weekly' ? MIN_WEEKLY_OFFSET : MIN_MONTHLY_OFFSET;
+        return Math.max(min, Math.min(0, prev + delta));
+      });
+    },
+    [chartPeriodMode]
+  );
+
   const resetDemo = useCallback(() => {
     setCountryCode('ID');
     setSockets(createInitialSockets());
     setDailyHistory(INITIAL_DAILY_HISTORY);
+    setChartPeriodModeState('weekly');
+    setPeriodOffset(0);
+    setSimulatedDaysElapsed(0);
+    setCompletedSimulatedDays({});
     setIsSafetyLocked(false);
     setClockSeconds(INITIAL_CLOCK_SECONDS);
     setSpeedMultiplier(60);
@@ -806,16 +841,25 @@ export function useSimulatorEngine() {
         const s2 = s.sockets.find((sock) => sock.socketId === 2)?.dailyKwh ?? 0;
         const s3 = s.sockets.find((sock) => sock.socketId === 3)?.dailyKwh ?? 0;
         const s4 = s.sockets.find((sock) => sock.socketId === 4)?.dailyKwh ?? 0;
+        const completedRecord = {
+          s1Kwh: Number(s1.toFixed(3)),
+          s2Kwh: Number(s2.toFixed(3)),
+          s3Kwh: Number(s3.toFixed(3)),
+          s4Kwh: Number(s4.toFixed(3)),
+        };
         setDailyHistory((prev) => [
           ...prev.slice(1),
           {
             dayLabel: prevClock.dayName,
-            s1Kwh: Number(s1.toFixed(3)),
-            s2Kwh: Number(s2.toFixed(3)),
-            s3Kwh: Number(s3.toFixed(3)),
-            s4Kwh: Number(s4.toFixed(3)),
+            ...completedRecord,
           },
         ]);
+        const currentElapsed = s.simulatedDaysElapsed;
+        setCompletedSimulatedDays((prev) => ({
+          ...prev,
+          [currentElapsed]: completedRecord,
+        }));
+        setSimulatedDaysElapsed((prev) => prev + 1);
       }
 
       const totalActiveWatts = s.sockets.reduce(
@@ -1037,12 +1081,41 @@ export function useSimulatorEngine() {
     [sockets, country, schedules, autoOnOffPeak]
   );
 
+  const periodAnalytics = useMemo(
+    () =>
+      buildPeriodAnalytics({
+        mode: chartPeriodMode,
+        periodOffset,
+        referenceDate,
+        sockets,
+        completedSimulatedDays,
+        simulatedDaysElapsed,
+        country,
+        schedules,
+        autoOnOffPeak,
+      }),
+    [
+      chartPeriodMode,
+      periodOffset,
+      referenceDate,
+      sockets,
+      completedSimulatedDays,
+      simulatedDaysElapsed,
+      country,
+      schedules,
+      autoOnOffPeak,
+    ]
+  );
+
   return {
     // Core state
     countryCode,
     country,
     sockets,
     dailyHistory,
+    chartPeriodMode,
+    periodOffset,
+    periodAnalytics,
     activeSockets,
     isSafetyLocked,
     relayState,
@@ -1071,6 +1144,8 @@ export function useSimulatorEngine() {
 
     // Actions
     selectCountry,
+    setChartPeriodMode,
+    stepPeriodOffset,
     toggleSocket,
     setSocketCutoffTimer,
     resetSafetyLock,

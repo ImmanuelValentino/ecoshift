@@ -57,6 +57,45 @@ export interface DailyUsageRecord {
   s4Kwh: number;
 }
 
+export type ChartPeriodMode = 'weekly' | 'monthly';
+
+export interface ChartBarDatum {
+  id: string;
+  label: string;
+  tooltipLabel: string;
+  s1Kwh: number;
+  s2Kwh: number;
+  s3Kwh: number;
+  s4Kwh: number;
+  totalKwh: number;
+  peakKwh: number;
+  offPeakKwh: number;
+  peakCost: number;
+  offPeakCost: number;
+  cost: number;
+  savings: number;
+  co2AvoidedKg: number;
+}
+
+export interface PeriodAnalyticsSummary {
+  mode: ChartPeriodMode;
+  periodOffset: number;
+  periodLabel: string;
+  isCurrentPeriod: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  bars: ChartBarDatum[];
+  totalKwh: number;
+  totalPeakKwh: number;
+  totalOffPeakKwh: number;
+  peakCost: number;
+  offPeakCost: number;
+  totalBill: number;
+  totalOffPeakSavings: number;
+  totalCo2AvoidedKg: number;
+  peakLoadShavedKw: number;
+}
+
 export type RelayState = 'ON' | 'OFF' | 'TRIPPED';
 
 export type SpeedMultiplier = 0 | 1 | 60 | 300 | 1800;

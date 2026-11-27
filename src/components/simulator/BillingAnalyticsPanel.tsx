@@ -1,4 +1,4 @@
-import { Activity, Globe, Info, Leaf, TrendingDown } from 'lucide-react';
+import { Activity, ChevronLeft, ChevronRight, Globe, Info, Leaf, TrendingDown } from 'lucide-react';
 import { COUNTRY_LIST } from '../../data/countries';
 import { formatCurrency, formatRate } from '../../engine/billingCalculator';
 import { SimulatorEngine } from '../../engine/useSimulatorEngine';
@@ -23,7 +23,10 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
     thermalStatus,
     voltageStatus,
     voltageHistory,
-    monthlyProjection,
+    chartPeriodMode,
+    periodAnalytics,
+    setChartPeriodMode,
+    stepPeriodOffset,
     anomalyLogs,
     faultInjection,
   } = engine;
@@ -51,11 +54,11 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
   const safeBottomY = mapY(198);
   const maxToleranceY = mapY(242);
 
-  const totalCost = monthlyProjection.totalMonthlyBill;
+  const totalCost = periodAnalytics.totalBill;
   const peakSharePct =
-    totalCost > 0 ? (monthlyProjection.peakCost / totalCost) * 100 : 0;
+    totalCost > 0 ? (periodAnalytics.peakCost / totalCost) * 100 : 0;
   const offPeakSharePct =
-    totalCost > 0 ? (monthlyProjection.offPeakCost / totalCost) * 100 : 0;
+    totalCost > 0 ? (periodAnalytics.offPeakCost / totalCost) * 100 : 0;
 
   return (
     <div className="space-y-3.5">
@@ -233,19 +236,77 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
         </div>
       </div>
 
-      {/* Monthly Bill Breakdown, Off-Peak Savings & CO2 Impact */}
+      {/* Synchronized Period Bill Breakdown, Off-Peak Savings & CO2 Impact */}
       <div className="bg-white rounded-2xl border border-black/[0.08] p-3.5 space-y-3 shadow-xs">
+        <div className="flex items-center justify-between gap-2">
+          <div className="inline-flex bg-[#F5F5F7] p-0.5 rounded-lg border border-black/[0.06]">
+            <button
+              type="button"
+              onClick={() => setChartPeriodMode('weekly')}
+              className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
+                chartPeriodMode === 'weekly'
+                  ? 'bg-white text-[#1D1D1F] shadow-2xs'
+                  : 'text-[#6E6E73] hover:text-[#1D1D1F]'
+              }`}
+            >
+              Weekly
+            </button>
+            <button
+              type="button"
+              onClick={() => setChartPeriodMode('monthly')}
+              className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
+                chartPeriodMode === 'monthly'
+                  ? 'bg-white text-[#1D1D1F] shadow-2xs'
+                  : 'text-[#6E6E73] hover:text-[#1D1D1F]'
+              }`}
+            >
+              Monthly
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={!periodAnalytics.canGoBack}
+              onClick={() => stepPeriodOffset(-1)}
+              aria-label="Previous period"
+              className="p-1 rounded-lg bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#EAEAEF] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <span className="font-mono text-[11px] font-semibold text-[#1D1D1F] px-1 tabular-nums">
+              {periodAnalytics.periodLabel}
+            </span>
+            {periodAnalytics.isCurrentPeriod && (
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-[#047857] text-[9px] font-bold">
+                Current
+              </span>
+            )}
+            <button
+              type="button"
+              disabled={!periodAnalytics.canGoForward}
+              onClick={() => stepPeriodOffset(1)}
+              aria-label="Next period"
+              className="p-1 rounded-lg bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#EAEAEF] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6E6E73]">
-              30-Day Monthly Bill Estimate
+              {chartPeriodMode === 'weekly'
+                ? 'WEEKLY USAGE & BILL'
+                : 'MONTHLY USAGE & BILL'}
             </p>
             <p className="font-mono text-xl font-bold text-[#1D1D1F] tabular-nums mt-0.5">
-              {formatCurrency(monthlyProjection.totalMonthlyBill, country)}
+              {formatCurrency(periodAnalytics.totalBill, country)}
             </p>
           </div>
           <span className="font-mono text-xs font-semibold text-[#6E6E73] bg-[#F5F5F7] px-2.5 py-1 rounded-lg tabular-nums">
-            {monthlyProjection.monthlyTotalKwh.toFixed(1)} kWh/mo
+            {periodAnalytics.totalKwh.toFixed(1)} kWh
           </span>
         </div>
 
@@ -266,32 +327,45 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
           <div className="flex items-center justify-between text-[11px] font-mono tabular-nums">
             <span className="inline-flex items-center gap-1 text-[#B45309]">
               <span className="w-2 h-2 rounded-full bg-[#D97706]" />
-              Peak: {monthlyProjection.monthlyPeakKwh.toFixed(1)} kWh (
-              {formatCurrency(monthlyProjection.peakCost, country)})
+              Peak: {periodAnalytics.totalPeakKwh.toFixed(1)} kWh (
+              {formatCurrency(periodAnalytics.peakCost, country)})
             </span>
             <span className="inline-flex items-center gap-1 text-[#047857]">
               <span className="w-2 h-2 rounded-full bg-[#10B981]" />
-              Off-Peak: {monthlyProjection.monthlyOffPeakKwh.toFixed(1)} kWh
+              Off-Peak: {periodAnalytics.totalOffPeakKwh.toFixed(1)} kWh
             </span>
           </div>
         </div>
 
-        {/* Off-Peak Savings & CO2 Avoided Side-by-Side */}
+        {/* Off-Peak Savings (or Tarif Flat PLN) & CO2 Avoided Side-by-Side */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-xl bg-emerald-50/70 border border-emerald-200/70 p-2.5">
-            <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#047857]">
-              <TrendingDown className="w-3.5 h-3.5" />
-              Off-Peak Savings
+          {country.isTOU ? (
+            <div className="rounded-xl bg-emerald-50/70 border border-emerald-200/70 p-2.5">
+              <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#047857]">
+                <TrendingDown className="w-3.5 h-3.5" />
+                Off-Peak Savings
+              </div>
+              <p className="font-mono text-base font-bold text-[#047857] tabular-nums mt-1">
+                {formatCurrency(periodAnalytics.totalOffPeakSavings, country)}
+              </p>
+              <p className="text-[10px] text-[#065F46]/80 mt-0.5">
+                {periodAnalytics.totalOffPeakKwh.toFixed(1)} kWh off-peak
+              </p>
             </div>
-            <p className="font-mono text-base font-bold text-[#047857] tabular-nums mt-1">
-              {formatCurrency(monthlyProjection.offPeakSavings, country)}
-            </p>
-            <p className="text-[10px] text-[#065F46]/80 mt-0.5">
-              {country.isTOU
-                ? 'TOU tariff arbitrage / mo'
-                : 'Flat tariff (Rp 0 arbitrage)'}
-            </p>
-          </div>
+          ) : (
+            <div className="rounded-xl bg-amber-50/70 border border-amber-200 p-2.5">
+              <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#92400E]">
+                <TrendingDown className="w-3.5 h-3.5" />
+                TARIF FLAT (PLN)
+              </div>
+              <p className="font-mono text-sm font-bold text-[#92400E] tabular-nums mt-1">
+                {formatRate(country.peakRate, country)}
+              </p>
+              <p className="text-[10px] text-[#92400E]/85 mt-0.5">
+                {periodAnalytics.peakLoadShavedKw.toFixed(2)} kW shifted off-peak
+              </p>
+            </div>
+          )}
 
           <div className="rounded-xl bg-[#F5F5F7] border border-black/[0.06] p-2.5">
             <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#1D1D1F]">
@@ -299,7 +373,7 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
               CO2 Avoided
             </div>
             <p className="font-mono text-base font-bold text-[#1D1D1F] tabular-nums mt-1">
-              {monthlyProjection.co2AvoidedKg.toFixed(2)} kg
+              {periodAnalytics.totalCo2AvoidedKg.toFixed(2)} kg
             </p>
             <p className="text-[10px] text-[#6E6E73] mt-0.5">
               {country.peakCarbonGPerKwh} to {country.offPeakCarbonGPerKwh} g/kWh

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Activity,
   Battery,
@@ -6,6 +6,7 @@ import {
   CalendarClock,
   CheckCheck,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   CloudLightning,
   CloudRain,
@@ -21,7 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { DAY_NAMES_SHORT } from '../../data/appliances';
-import { formatCurrency } from '../../engine/billingCalculator';
+import { formatCurrency, formatRate } from '../../engine/billingCalculator';
 import { SimulatorEngine } from '../../engine/useSimulatorEngine';
 import { SocketId } from '../../types/simulator';
 
@@ -74,7 +75,8 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
     clock,
     country,
     sockets,
-    dailyHistory,
+    chartPeriodMode,
+    periodAnalytics,
     activeSockets,
     isSafetyLocked,
     faultInjection,
@@ -90,7 +92,8 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
     schedules,
     activeBanner,
     whatsappMessages,
-    monthlyProjection,
+    setChartPeriodMode,
+    stepPeriodOffset,
     toggleSocket,
     setSocketCutoffTimer,
     resetSafetyLock,
@@ -103,7 +106,25 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
 
   const [activeTab, setActiveTab] = useState<PhoneTab>('dashboard');
   const [seenWhatsAppCount, setSeenWhatsAppCount] = useState(0);
-  const [selectedDayIdx, setSelectedDayIdx] = useState<number>(5);
+  const [pinnedBarIdx, setPinnedBarIdx] = useState<number | null>(null);
+  const [hoveredBarIdx, setHoveredBarIdx] = useState<number | null>(null);
+  const chartCardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setPinnedBarIdx(null);
+    setHoveredBarIdx(null);
+  }, [chartPeriodMode, periodAnalytics.periodOffset]);
+
+  useEffect(() => {
+    const handleOutsidePointerDown = (e: PointerEvent) => {
+      if (chartCardRef.current && !chartCardRef.current.contains(e.target as Node)) {
+        setPinnedBarIdx(null);
+        setHoveredBarIdx(null);
+      }
+    };
+    document.addEventListener('pointerdown', handleOutsidePointerDown);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown);
+  }, []);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newSocketId, setNewSocketId] = useState<SocketId>(1);
@@ -129,37 +150,37 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
   const isHeavyRain = weather.condition === 'HEAVY_RAIN';
   const maxSocketDailyKwh = Math.max(0.01, ...sockets.map((s) => s.dailyKwh));
 
-  // Build 6-day stacked bar dataset (5 history days + live Today bar)
-  const chartDays = [
-    ...dailyHistory,
-    {
-      dayLabel: 'Today',
-      s1Kwh: sockets[0]?.dailyKwh ?? 0,
-      s2Kwh: sockets[1]?.dailyKwh ?? 0,
-      s3Kwh: sockets[2]?.dailyKwh ?? 0,
-      s4Kwh: sockets[3]?.dailyKwh ?? 0,
-    },
-  ];
-  const rawMaxDailyTotal = Math.max(
+  const chartBars = periodAnalytics.bars;
+  const rawMaxPeriodKwh = Math.max(
     1,
-    ...chartDays.map((d) => d.s1Kwh + d.s2Kwh + d.s3Kwh + d.s4Kwh)
+    ...chartBars.map((b) => b.totalKwh)
   );
   const yStep =
-    rawMaxDailyTotal <= 6
+    rawMaxPeriodKwh <= 6
       ? 2
-      : rawMaxDailyTotal <= 12
-        ? 4
-        : rawMaxDailyTotal <= 18
-          ? 6
-          : Math.ceil(rawMaxDailyTotal / 3);
+      : rawMaxPeriodKwh <= 15
+        ? 5
+        : rawMaxPeriodKwh <= 30
+          ? 10
+          : rawMaxPeriodKwh <= 60
+            ? 20
+            : Math.ceil(rawMaxPeriodKwh / 3 / 5) * 5;
   const yMax = yStep * 3;
   const yTicks = [yMax, yStep * 2, yStep, 0];
-  const inspectedDay = chartDays[selectedDayIdx] ?? chartDays[chartDays.length - 1];
-  const inspectedTotal =
-    inspectedDay.s1Kwh +
-    inspectedDay.s2Kwh +
-    inspectedDay.s3Kwh +
-    inspectedDay.s4Kwh;
+
+  const activeTooltipIdx = pinnedBarIdx !== null ? pinnedBarIdx : hoveredBarIdx;
+  const tooltipBar =
+    activeTooltipIdx !== null ? chartBars[activeTooltipIdx] ?? null : null;
+
+  const getTooltipPositionClass = (idx: number, total: number): string => {
+    if (idx === 0 || (total >= 7 && idx === 1)) {
+      return 'left-0';
+    }
+    if (idx === total - 1 || (total >= 7 && idx === total - 2)) {
+      return 'right-0';
+    }
+    return 'left-1/2 -translate-x-1/2';
+  };
 
   const handleToggleDay = (dayIdx: number) => {
     setNewDays((prev) =>
@@ -347,15 +368,88 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
                 </div>
               </button>
 
-              {/* Stacked Bar Chart: Daily Usage by Socket (kWh) */}
-              <div className="bg-white rounded-2xl p-3 border border-black/[0.06] space-y-2">
+              {/* Stacked Bar Chart: Daily Usage by Socket (kWh) with Weekly/Monthly & 1-Year History */}
+              <div
+                ref={chartCardRef}
+                onClick={(e) => {
+                  // Clicking empty background inside card closes tooltip
+                  if ((e.target as HTMLElement).closest('button[data-chart-bar]') === null &&
+                      (e.target as HTMLElement).closest('[data-chart-nav]') === null) {
+                    setPinnedBarIdx(null);
+                    setHoveredBarIdx(null);
+                  }
+                }}
+                className="bg-white rounded-2xl p-3 border border-black/[0.06] space-y-2 relative"
+              >
+                {/* Header Row + Weekly/Monthly Mode Switch */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[11px] font-semibold text-[#1D1D1F]">
                     Daily Usage by Socket (kWh)
                   </span>
-                  <span className="font-mono text-[10px] font-semibold text-[#047857] tabular-nums">
-                    {inspectedDay.dayLabel}: {inspectedTotal.toFixed(2)} kWh
-                  </span>
+                  <div
+                    data-chart-nav="true"
+                    className="inline-flex bg-[#F5F5F7] p-0.5 rounded-lg border border-black/[0.05]"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setChartPeriodMode('weekly')}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
+                        chartPeriodMode === 'weekly'
+                          ? 'bg-white text-[#1D1D1F] shadow-2xs'
+                          : 'text-[#6E6E73] hover:text-[#1D1D1F]'
+                      }`}
+                    >
+                      Weekly
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChartPeriodMode('monthly')}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
+                        chartPeriodMode === 'monthly'
+                          ? 'bg-white text-[#1D1D1F] shadow-2xs'
+                          : 'text-[#6E6E73] hover:text-[#1D1D1F]'
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                  </div>
+                </div>
+
+                {/* Period Navigation Bar (< Date Range / Month >) */}
+                <div
+                  data-chart-nav="true"
+                  className="flex items-center justify-between gap-1.5 bg-[#F5F5F7] rounded-xl px-2 py-1"
+                >
+                  <button
+                    type="button"
+                    disabled={!periodAnalytics.canGoBack}
+                    onClick={() => stepPeriodOffset(-1)}
+                    aria-label="Previous period"
+                    className="p-1 rounded-lg text-[#1D1D1F] hover:bg-white disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-mono text-[10px] font-semibold text-[#1D1D1F] truncate tabular-nums">
+                      {periodAnalytics.periodLabel}
+                    </span>
+                    {periodAnalytics.isCurrentPeriod && (
+                      <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-[#047857] text-[9px] font-bold">
+                        Current
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!periodAnalytics.canGoForward}
+                    onClick={() => stepPeriodOffset(1)}
+                    aria-label="Next period"
+                    className="p-1 rounded-lg text-[#1D1D1F] hover:bg-white disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
                 {/* Compact 4-Socket Legend */}
@@ -378,20 +472,65 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
                   </span>
                 </div>
 
-                {/* Chart Plot Area: Y-Axis + 6 Stacked Bars */}
+                {/* Chart Plot Area: Y-Axis (kWh) + Stacked Bars + Edge-Clamped Floating Tooltip */}
                 <div className="relative pt-1">
-                  <div className="flex items-stretch gap-1.5 h-[108px]">
-                    {/* Y-Axis Labels */}
-                    <div className="flex flex-col justify-between text-right pr-1 font-mono text-[9px] text-[#86868B] tabular-nums select-none pb-4">
-                      {yTicks.map((t) => (
-                        <span key={t} className="leading-none">
-                          {t}
-                        </span>
-                      ))}
+                  {/* Floating Tooltip Overlay */}
+                  {tooltipBar && activeTooltipIdx !== null && (
+                    <div
+                      role="status"
+                      className={`pointer-events-none absolute -top-1 z-20 w-[156px] rounded-xl bg-[#1D1D1F]/95 text-white px-2.5 py-2 shadow-lg border border-white/10 ${getTooltipPositionClass(
+                        activeTooltipIdx,
+                        chartBars.length
+                      )}`}
+                    >
+                      <p className="text-[10px] font-bold text-white truncate">
+                        {tooltipBar.tooltipLabel}
+                      </p>
+                      <div className="mt-1 space-y-0.5 font-mono text-[10px] tabular-nums">
+                        <div className="flex items-center justify-between text-slate-200">
+                          <span>Total</span>
+                          <span className="font-bold text-white">
+                            {tooltipBar.totalKwh.toFixed(2)} kWh
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-200">
+                          <span>Cost</span>
+                          <span className="font-bold text-white">
+                            {formatCurrency(tooltipBar.cost, country)}
+                          </span>
+                        </div>
+                        {country.isTOU && (
+                          <div className="flex items-center justify-between text-[#34D399]">
+                            <span>Savings</span>
+                            <span className="font-bold">
+                              {formatCurrency(tooltipBar.savings, country)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-stretch gap-1 h-[118px]">
+                    {/* Y-Axis Unit Label ('kWh') + Numeric Scale */}
+                    <div className="flex items-stretch gap-1 shrink-0 pb-4">
+                      <span className="self-center -rotate-90 text-[8px] font-semibold uppercase tracking-wider text-[#6E6E73] select-none w-3 text-center">
+                        kWh
+                      </span>
+                      <div className="flex flex-col justify-between text-right pr-1 font-mono text-[9px] text-[#86868B] tabular-nums select-none">
+                        {yTicks.map((t) => (
+                          <span key={t} className="leading-none">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Gridlines & Bars Container */}
-                    <div className="relative flex-1 flex flex-col">
+                    <div
+                      className="relative flex-1 flex flex-col"
+                      onMouseLeave={() => setHoveredBarIdx(null)}
+                    >
                       <div className="relative flex-1 flex items-end justify-between gap-1.5 px-1">
                         {/* Horizontal Grid Lines */}
                         <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
@@ -404,101 +543,89 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
                         </div>
 
                         {/* Stacked Bars (Bottom-to-Top: S1 -> S2 -> S3 -> S4) */}
-                        {chartDays.map((day, idx) => {
-                          const total = day.s1Kwh + day.s2Kwh + day.s3Kwh + day.s4Kwh;
-                          const totalPct = Math.min(100, (total / yMax) * 100);
-                          const s1Pct = total > 0 ? (day.s1Kwh / total) * 100 : 0;
-                          const s2Pct = total > 0 ? (day.s2Kwh / total) * 100 : 0;
-                          const s3Pct = total > 0 ? (day.s3Kwh / total) * 100 : 0;
-                          const s4Pct = total > 0 ? (day.s4Kwh / total) * 100 : 0;
-                          const isSelected = idx === selectedDayIdx;
+                        {chartBars.map((bar, idx) => {
+                          const totalPct =
+                            bar.totalKwh > 0
+                              ? Math.min(100, (bar.totalKwh / yMax) * 100)
+                              : 0;
+                          const s1Pct =
+                            bar.totalKwh > 0 ? (bar.s1Kwh / bar.totalKwh) * 100 : 0;
+                          const s2Pct =
+                            bar.totalKwh > 0 ? (bar.s2Kwh / bar.totalKwh) * 100 : 0;
+                          const s3Pct =
+                            bar.totalKwh > 0 ? (bar.s3Kwh / bar.totalKwh) * 100 : 0;
+                          const s4Pct =
+                            bar.totalKwh > 0 ? (bar.s4Kwh / bar.totalKwh) * 100 : 0;
+                          const isSelected = activeTooltipIdx === idx;
 
                           return (
                             <button
-                              key={`${day.dayLabel}-${idx}`}
+                              key={bar.id}
                               type="button"
-                              onClick={() => setSelectedDayIdx(idx)}
-                              onMouseEnter={() => setSelectedDayIdx(idx)}
+                              data-chart-bar="true"
+                              onClick={() => {
+                                setPinnedBarIdx((prev) => (prev === idx ? null : idx));
+                                setHoveredBarIdx(null);
+                              }}
+                              onMouseEnter={() => setHoveredBarIdx(idx)}
                               className="relative z-10 flex-1 h-full flex flex-col justify-end items-center group cursor-pointer focus:outline-none"
-                              aria-label={`${day.dayLabel}: ${total.toFixed(2)} kWh`}
+                              aria-label={`${bar.tooltipLabel}: ${bar.totalKwh.toFixed(2)} kWh`}
                             >
-                              <div
-                                className={`w-full max-w-[24px] flex flex-col-reverse rounded-t-sm overflow-hidden transition-all duration-300 ${
-                                  isSelected
-                                    ? 'ring-1 ring-[#1D1D1F] ring-offset-1'
-                                    : 'opacity-90 group-hover:opacity-100'
-                                }`}
-                                style={{ height: `${Math.max(2, totalPct)}%` }}
-                              >
+                              {bar.totalKwh > 0 ? (
                                 <div
-                                  className="w-full bg-[#10B981]"
-                                  style={{ height: `${s1Pct}%` }}
-                                />
-                                <div
-                                  className="w-full bg-[#3B82F6]"
-                                  style={{ height: `${s2Pct}%` }}
-                                />
-                                <div
-                                  className="w-full bg-[#F59E0B]"
-                                  style={{ height: `${s3Pct}%` }}
-                                />
-                                <div
-                                  className="w-full bg-[#6366F1]"
-                                  style={{ height: `${s4Pct}%` }}
-                                />
-                              </div>
+                                  className={`w-full ${
+                                    chartBars.length <= 4 ? 'max-w-[34px]' : 'max-w-[22px]'
+                                  } flex flex-col-reverse rounded-t-sm overflow-hidden transition-all duration-300 ${
+                                    isSelected
+                                      ? 'ring-1 ring-[#1D1D1F] ring-offset-1'
+                                      : 'opacity-90 group-hover:opacity-100'
+                                  }`}
+                                  style={{ height: `${Math.max(3, totalPct)}%` }}
+                                >
+                                  <div
+                                    className="w-full bg-[#10B981]"
+                                    style={{ height: `${s1Pct}%` }}
+                                  />
+                                  <div
+                                    className="w-full bg-[#3B82F6]"
+                                    style={{ height: `${s2Pct}%` }}
+                                  />
+                                  <div
+                                    className="w-full bg-[#F59E0B]"
+                                    style={{ height: `${s3Pct}%` }}
+                                  />
+                                  <div
+                                    className="w-full bg-[#6366F1]"
+                                    style={{ height: `${s4Pct}%` }}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-full max-w-[22px] h-[2px] rounded-full bg-[#E5E7EB]" />
+                              )}
                             </button>
                           );
                         })}
                       </div>
 
-                      {/* X-Axis Day Labels */}
+                      {/* X-Axis Labels */}
                       <div className="flex items-center justify-between gap-1.5 px-1 pt-1">
-                        {chartDays.map((day, idx) => {
-                          const isSelected = idx === selectedDayIdx;
+                        {chartBars.map((bar, idx) => {
+                          const isSelected = activeTooltipIdx === idx;
                           return (
                             <span
-                              key={`lbl-${day.dayLabel}-${idx}`}
+                              key={`lbl-${bar.id}`}
                               className={`flex-1 text-center font-mono text-[9px] truncate ${
                                 isSelected
                                   ? 'font-bold text-[#1D1D1F]'
                                   : 'text-[#6E6E73]'
                               }`}
                             >
-                              {day.dayLabel}
+                              {bar.label}
                             </span>
                           );
                         })}
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                {/* Selected Day Interactive Breakdown */}
-                <div className="grid grid-cols-4 gap-1 bg-[#F5F5F7] rounded-xl p-1.5 font-mono text-[9px] tabular-nums text-center">
-                  <div>
-                    <span className="text-[#047857] font-semibold block">S1</span>
-                    <span className="font-bold text-[#1D1D1F]">
-                      {inspectedDay.s1Kwh.toFixed(2)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#2563EB] font-semibold block">S2</span>
-                    <span className="font-bold text-[#1D1D1F]">
-                      {inspectedDay.s2Kwh.toFixed(2)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#D97706] font-semibold block">S3</span>
-                    <span className="font-bold text-[#1D1D1F]">
-                      {inspectedDay.s3Kwh.toFixed(2)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#4F46E5] font-semibold block">S4</span>
-                    <span className="font-bold text-[#1D1D1F]">
-                      {inspectedDay.s4Kwh.toFixed(2)}
-                    </span>
                   </div>
                 </div>
               </div>
@@ -540,42 +667,42 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
                 </div>
               </div>
 
-              {/* 30-Day Monthly Bill Estimate & Adaptive Off-Peak Card */}
+              {/* Actual Period Bill & Adaptive Off-Peak / Flat Tariff Card */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-white rounded-2xl p-3 border border-black/[0.06]">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6E6E73] block">
-                    30-Day Est. Bill
+                    {chartPeriodMode === 'weekly' ? 'WEEKLY BILL' : 'MONTHLY BILL'}
                   </span>
                   <p className="font-mono text-sm font-bold text-[#1D1D1F] tabular-nums mt-1 truncate">
-                    {formatCurrency(monthlyProjection.totalMonthlyBill, country)}
+                    {formatCurrency(periodAnalytics.totalBill, country)}
                   </p>
                   <p className="font-mono text-[10px] text-[#6E6E73] mt-0.5 tabular-nums">
-                    {monthlyProjection.monthlyTotalKwh.toFixed(1)} kWh/mo
+                    {periodAnalytics.totalKwh.toFixed(1)} kWh
                   </p>
                 </div>
 
                 {country.isTOU ? (
                   <div className="bg-emerald-50/80 rounded-2xl p-3 border border-emerald-200/80">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-[#047857] block">
-                      Off-Peak Savings
+                      OFF-PEAK SAVINGS
                     </span>
                     <p className="font-mono text-sm font-bold text-[#047857] tabular-nums mt-1 truncate">
-                      {formatCurrency(monthlyProjection.offPeakSavings, country)}
+                      {formatCurrency(periodAnalytics.totalOffPeakSavings, country)}
                     </p>
                     <p className="font-mono text-[10px] text-[#065F46]/80 mt-0.5 tabular-nums">
-                      Off-Peak: {monthlyProjection.monthlyOffPeakKwh.toFixed(0)} kWh
+                      Off-Peak: {periodAnalytics.totalOffPeakKwh.toFixed(1)} kWh
                     </p>
                   </div>
                 ) : (
                   <div className="bg-amber-50/80 rounded-2xl p-3 border border-amber-200">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-[#92400E] block">
-                      Flat Tariff (PLN)
+                      TARIF FLAT (PLN)
                     </span>
-                    <p className="font-mono text-sm font-bold text-[#92400E] tabular-nums mt-1">
-                      {monthlyProjection.peakLoadShavedKw.toFixed(2)} kW
+                    <p className="font-mono text-xs font-bold text-[#92400E] tabular-nums mt-1 truncate">
+                      {formatRate(country.peakRate, country)}
                     </p>
                     <p className="text-[10px] text-[#92400E]/85 mt-0.5">
-                      Peak Load Shifted
+                      {periodAnalytics.peakLoadShavedKw.toFixed(2)} kW Shifted
                     </p>
                   </div>
                 )}
