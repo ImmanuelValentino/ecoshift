@@ -9,12 +9,13 @@ import {
 import {
   AnomalyEvent,
   AnomalyType,
-  ApplianceId,
   CountryCode,
   FaultInjection,
   MobileNotification,
   RelayState,
   ScheduleSlot,
+  SocketId,
+  SocketState,
   SpeedMultiplier,
   ThermalStatus,
   VoltagePoint,
@@ -25,7 +26,7 @@ import {
   WhatsAppMessage,
 } from '../types/simulator';
 import {
-  calculateMonthlyProjection,
+  calculateMultiSocketMonthlyProjection,
   isOffPeakMinute,
   parseTimeToMinutes,
 } from './billingCalculator';
@@ -37,6 +38,7 @@ const TICK_MS = 250;
 const MAX_VOLTAGE_POINTS = 32;
 const AMBIENT_PLUG_TEMP_C = 28.0;
 const INITIAL_PLUG_TEMP_C = 34.5;
+const MAX_STRIP_POWER_W = 2400;
 
 export function getThermalStatus(tempC: number): ThermalStatus {
   if (tempC >= 70) return 'OVERHEAT';
@@ -51,11 +53,41 @@ export function getVoltageStatus(voltage: number): VoltageStatus {
   return 'NORMAL';
 }
 
-function getSteadyStateTempForWattage(wattage: number): number {
-  if (wattage >= 1400) return 66.5; // Water Heater: climbs into Warm (56-69C) under sustained run
-  if (wattage >= 800) return 58.0; // AC: reaches Warm advisory band
-  if (wattage >= 300) return 41.5; // Dispenser: stays Normal
-  return 32.5; // Charger: stays cool
+function getSteadyStateTempForTotalPower(totalWatts: number): number {
+  if (totalWatts <= 0) return AMBIENT_PLUG_TEMP_C;
+  if (totalWatts <= 500) return 36.0;
+  if (totalWatts <= 1500) return 54.0;
+  if (totalWatts <= 2100) return 63.5;
+  return 72.5; // High combined load (e.g., 2,400W) climbs past 70C if sustained
+}
+
+function createInitialSockets(): SocketState[] {
+  return APPLIANCE_PRESETS.map((appliance) => {
+    if (appliance.socketId === 1) {
+      return {
+        socketId: 1,
+        appliance,
+        isOn: true,
+        activeDurationSeconds: 288,
+        activeSessionKwh: 0.12,
+        dailyKwh: 0.42,
+        autoCutoffMinutes: null,
+        remainingCutoffSeconds: null,
+      };
+    }
+    const seedDaily =
+      appliance.socketId === 2 ? 0.95 : appliance.socketId === 3 ? 0.28 : 0.065;
+    return {
+      socketId: appliance.socketId,
+      appliance,
+      isOn: false,
+      activeDurationSeconds: 0,
+      activeSessionKwh: 0,
+      dailyKwh: seedDaily,
+      autoCutoffMinutes: null,
+      remainingCutoffSeconds: null,
+    };
+  });
 }
 
 export function decodeClock(totalSeconds: number) {
@@ -96,17 +128,15 @@ function buildInitialVoltageHistory(nominalVoltage: number): VoltagePoint[] {
 
 export function useSimulatorEngine() {
   const [countryCode, setCountryCode] = useState<CountryCode>('ID');
-  const [applianceId, setApplianceId] = useState<ApplianceId>('water_heater');
-  const [relayState, setRelayState] = useState<RelayState>('ON');
+  const [sockets, setSockets] = useState<SocketState[]>(createInitialSockets);
+  const [isSafetyLocked, setIsSafetyLocked] = useState<boolean>(false);
   const [clockSeconds, setClockSeconds] = useState<number>(INITIAL_CLOCK_SECONDS);
   const [speedMultiplier, setSpeedMultiplier] = useState<SpeedMultiplier>(60);
   const [faultInjection, setFaultInjection] = useState<FaultInjection>('NONE');
   const [plugTemperatureC, setPlugTemperatureC] = useState<number>(INITIAL_PLUG_TEMP_C);
 
-  const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
   const [autoOnOffPeak, setAutoOnOffPeak] = useState<boolean>(true);
   const [schedules, setSchedules] = useState<ScheduleSlot[]>(DEFAULT_SCHEDULES);
-  const [sessionKwh, setSessionKwh] = useState<number>(0.42);
 
   const [notifications, setNotifications] = useState<MobileNotification[]>([]);
   const [activeBanner, setActiveBanner] = useState<MobileNotification | null>(null);
@@ -122,20 +152,15 @@ export function useSimulatorEngine() {
   );
 
   const country = COUNTRY_CONFIGS[countryCode];
-  const appliance = useMemo(
-    () => APPLIANCE_PRESETS.find((a) => a.id === applianceId) ?? APPLIANCE_PRESETS[0],
-    [applianceId]
-  );
 
   const stateRef = useRef({
     country,
-    appliance,
-    relayState,
+    sockets,
+    isSafetyLocked,
     clockSeconds,
     speedMultiplier,
     faultInjection,
     plugTemperatureC,
-    timerRemainingSeconds,
     autoOnOffPeak,
     schedules,
     tickCount,
@@ -144,13 +169,12 @@ export function useSimulatorEngine() {
 
   stateRef.current = {
     country,
-    appliance,
-    relayState,
+    sockets,
+    isSafetyLocked,
     clockSeconds,
     speedMultiplier,
     faultInjection,
     plugTemperatureC,
-    timerRemainingSeconds,
     autoOnOffPeak,
     schedules,
     tickCount,
@@ -223,35 +247,37 @@ export function useSimulatorEngine() {
       type: AnomalyType,
       measuredValue: string,
       timestamp: string,
-      appName: string,
+      targetLabel: string,
       sensorSnapshot: { voltageV: number; temperatureC: number; powerW: number }
     ) => {
-      setRelayState('TRIPPED');
-      setTimerRemainingSeconds(null);
-
-      const titleMap: Record<AnomalyType, string> = {
-        UNDERVOLTAGE: 'WhatsApp: EcoShift Guard',
-        OVERVOLTAGE: 'WhatsApp: EcoShift Guard',
-        OVERLOAD: 'WhatsApp: EcoShift Guard',
-        OVERHEAT: 'WhatsApp: EcoShift Guard',
-      };
+      setIsSafetyLocked(true);
+      setSockets((prev) =>
+        prev.map((s) => ({
+          ...s,
+          isOn: false,
+          activeDurationSeconds: 0,
+          activeSessionKwh: 0,
+          autoCutoffMinutes: null,
+          remainingCutoffSeconds: null,
+        }))
+      );
 
       const eventTitleMap: Record<AnomalyType, string> = {
         UNDERVOLTAGE: 'Undervoltage Detected (<198V)',
         OVERVOLTAGE: 'Overvoltage Surge Detected (>242V)',
-        OVERLOAD: 'Socket Overload (>2,400W)',
+        OVERLOAD: 'Strip Overload (>2,400W)',
         OVERHEAT: 'Thermal Overheat (>=70°C)',
       };
 
       const detailMap: Record<AnomalyType, string> = {
-        UNDERVOLTAGE: `${measuredValue} sag violated SPLN 1:1995 (<198V). Power cut off to protect ${appName}.`,
-        OVERVOLTAGE: `${measuredValue} surge violated SPLN 1:1995 (>242V). Power cut off to protect ${appName}.`,
-        OVERLOAD: `${measuredValue} exceeded SNI IEC 60884-1 2,400W capacity. Power cut off for ${appName}.`,
-        OVERHEAT: `Plug temperature reached ${measuredValue} (SNI IEC 60884-1 limit 70°C). Power cut off for ${appName}.`,
+        UNDERVOLTAGE: `${measuredValue} sag violated SPLN 1:1995 (<198V). All active sockets cut off (${targetLabel}).`,
+        OVERVOLTAGE: `${measuredValue} surge violated SPLN 1:1995 (>242V). All active sockets cut off (${targetLabel}).`,
+        OVERLOAD: `${measuredValue} combined load exceeded SNI IEC 60884-1 2,400W limit. All sockets cut off.`,
+        OVERHEAT: `Strip temperature reached ${measuredValue} (limit 70°C). All sockets cut off (${targetLabel}).`,
       };
 
       pushNotification(
-        titleMap[type],
+        'WhatsApp: EcoShift Guard',
         detailMap[type],
         'critical',
         timestamp,
@@ -275,21 +301,29 @@ export function useSimulatorEngine() {
         simulatedTimestamp: timestamp,
         type,
         measuredValue,
-        applianceName: appName,
-        actionTaken: 'Auto-Cutoff + WhatsApp Alert Sent',
+        applianceName: targetLabel,
+        actionTaken: 'All Sockets Cut Off + WhatsApp Sent',
       };
       setAnomalyLogs((prev) => [logEntry, ...prev].slice(0, 20));
     },
     [pushNotification, pushWhatsAppAlert]
   );
 
-  // Instant fault injection trigger (called from DemoControlBar)
   const triggerFault = useCallback(
     (fault: FaultInjection) => {
       const s = stateRef.current;
       const clock = decodeClock(s.clockSeconds);
       const currentVoltage =
         s.voltageHistory[s.voltageHistory.length - 1]?.voltage ?? s.country.nominalVoltage;
+      const activeNames =
+        s.sockets
+          .filter((sock) => sock.isOn)
+          .map((sock) => `S${sock.socketId} ${sock.appliance.shortName}`)
+          .join(', ') || '4-Socket Strip';
+      const currentPower = s.sockets.reduce(
+        (sum, sock) => sum + (sock.isOn ? sock.appliance.wattage : 0),
+        0
+      );
 
       if (fault === 'NONE') {
         setFaultInjection('NONE');
@@ -309,10 +343,10 @@ export function useSimulatorEngine() {
           ...prev.slice(-(MAX_VOLTAGE_POINTS - 1)),
           { tick: s.tickCount + 1, voltage: measured, isAnomaly: true },
         ]);
-        executeSafetyTrip('UNDERVOLTAGE', `${measured.toFixed(1)} V`, clock.formattedFull, s.appliance.name, {
+        executeSafetyTrip('UNDERVOLTAGE', `${measured.toFixed(1)} V`, clock.formattedFull, activeNames, {
           voltageV: measured,
           temperatureC: s.plugTemperatureC,
-          powerW: s.relayState === 'ON' ? s.appliance.wattage : 0,
+          powerW: currentPower,
         });
       } else if (fault === 'OVERVOLTAGE') {
         const measured = 264.8;
@@ -320,10 +354,10 @@ export function useSimulatorEngine() {
           ...prev.slice(-(MAX_VOLTAGE_POINTS - 1)),
           { tick: s.tickCount + 1, voltage: measured, isAnomaly: true },
         ]);
-        executeSafetyTrip('OVERVOLTAGE', `${measured.toFixed(1)} V`, clock.formattedFull, s.appliance.name, {
+        executeSafetyTrip('OVERVOLTAGE', `${measured.toFixed(1)} V`, clock.formattedFull, activeNames, {
           voltageV: measured,
           temperatureC: s.plugTemperatureC,
-          powerW: s.relayState === 'ON' ? s.appliance.wattage : 0,
+          powerW: currentPower,
         });
       } else if (fault === 'OVERLOAD') {
         const measured = 2480;
@@ -336,7 +370,7 @@ export function useSimulatorEngine() {
           'OVERLOAD',
           `${measured.toLocaleString('en-US')} W`,
           clock.formattedFull,
-          s.appliance.name,
+          activeNames,
           {
             voltageV: vDuringFault,
             temperatureC: s.plugTemperatureC,
@@ -350,11 +384,11 @@ export function useSimulatorEngine() {
           'OVERHEAT',
           `${overheatTemp.toFixed(1)} °C`,
           clock.formattedFull,
-          s.appliance.name,
+          activeNames,
           {
             voltageV: currentVoltage,
             temperatureC: overheatTemp,
-            powerW: s.relayState === 'ON' ? s.appliance.wattage : 0,
+            powerW: currentPower,
           }
         );
       }
@@ -362,7 +396,6 @@ export function useSimulatorEngine() {
     [executeSafetyTrip]
   );
 
-  // Weather Mode & Live API handling
   const emitWeatherWhatsAppIfExtreme = useCallback(
     (nextWeather: WeatherState) => {
       if (nextWeather.condition !== 'HEAVY_RAIN' && nextWeather.condition !== 'THUNDERSTORM') {
@@ -372,7 +405,10 @@ export function useSimulatorEngine() {
       const clock = decodeClock(s.clockSeconds);
       const currentVoltage =
         s.voltageHistory[s.voltageHistory.length - 1]?.voltage ?? s.country.nominalVoltage;
-      const currentPower = s.relayState === 'ON' ? s.appliance.wattage : 0;
+      const currentPower = s.sockets.reduce(
+        (sum, sock) => sum + (sock.isOn ? sock.appliance.wattage : 0),
+        0
+      );
       const isStorm = nextWeather.condition === 'THUNDERSTORM';
       const title = isStorm
         ? `Thunderstorm Alert (${nextWeather.city})`
@@ -414,7 +450,6 @@ export function useSimulatorEngine() {
     [emitWeatherWhatsAppIfExtreme]
   );
 
-  // Fetch initial weather on mount (with clean fallback if key missing)
   useEffect(() => {
     const controller = new AbortController();
     let mounted = true;
@@ -434,38 +469,6 @@ export function useSimulatorEngine() {
     };
   }, [emitWeatherWhatsAppIfExtreme]);
 
-  const toggleRelay = useCallback(() => {
-    const s = stateRef.current;
-    const clock = decodeClock(s.clockSeconds);
-
-    if (s.relayState === 'TRIPPED') {
-      if (s.faultInjection !== 'NONE') {
-        pushNotification(
-          'Safety Lockout Active',
-          'Grid or thermal fault is still active. Restore Normal state before resetting safety lock.',
-          'critical',
-          clock.formattedFull
-        );
-        return;
-      }
-      setRelayState('OFF');
-      pushNotification(
-        'Safety Lock Reset',
-        `Grid voltage (${s.country.nominalVoltage}V) and plug temperature (${s.plugTemperatureC.toFixed(1)}°C) verified safe.`,
-        'info',
-        clock.formattedFull
-      );
-      return;
-    }
-
-    if (s.relayState === 'ON') {
-      setRelayState('OFF');
-      setTimerRemainingSeconds(null);
-    } else {
-      setRelayState('ON');
-    }
-  }, [pushNotification]);
-
   const resetSafetyLock = useCallback(() => {
     const s = stateRef.current;
     const clock = decodeClock(s.clockSeconds);
@@ -480,23 +483,165 @@ export function useSimulatorEngine() {
       return;
     }
 
-    setRelayState('OFF');
+    if (s.plugTemperatureC >= 70) {
+      setPlugTemperatureC(42.0);
+    }
+    setIsSafetyLocked(false);
     pushNotification(
       'Safety Lock Cleared',
-      `EcoShift Smart Plug reset safely. Voltage ${s.country.nominalVoltage}V, Temp ${s.plugTemperatureC.toFixed(1)}°C.`,
+      `4-Socket Strip reset safely. Voltage ${s.country.nominalVoltage}V, Temp ${Math.min(42, s.plugTemperatureC).toFixed(1)}°C.`,
       'info',
       clock.formattedFull
     );
   }, [pushNotification]);
 
-  const setCountdownMinutes = useCallback((minutes: number | null) => {
-    if (minutes === null || minutes <= 0) {
-      setTimerRemainingSeconds(null);
-      return;
-    }
-    setTimerRemainingSeconds(minutes * 60);
-    setRelayState((prev) => (prev === 'OFF' ? 'ON' : prev));
-  }, []);
+  const toggleSocket = useCallback(
+    (socketId: SocketId) => {
+      const s = stateRef.current;
+      const clock = decodeClock(s.clockSeconds);
+      const target = s.sockets.find((sock) => sock.socketId === socketId);
+      if (!target) return;
+
+      if (s.isSafetyLocked) {
+        if (s.faultInjection !== 'NONE') {
+          pushNotification(
+            'Safety Lockout Active',
+            'Grid or thermal fault is still active. Restore Normal state before switching sockets ON.',
+            'critical',
+            clock.formattedFull
+          );
+          return;
+        }
+        setIsSafetyLocked(false);
+      }
+
+      if (target.isOn) {
+        // Turn OFF & reset active session metrics
+        setSockets((prev) =>
+          prev.map((sock) =>
+            sock.socketId === socketId
+              ? {
+                  ...sock,
+                  isOn: false,
+                  activeDurationSeconds: 0,
+                  activeSessionKwh: 0,
+                  autoCutoffMinutes: null,
+                  remainingCutoffSeconds: null,
+                }
+              : sock
+          )
+        );
+        return;
+      }
+
+      // Turning ON: check combined load against 2,400W SNI IEC 60884-1 limit
+      const projectedPower =
+        s.sockets.reduce(
+          (sum, sock) => sum + (sock.isOn ? sock.appliance.wattage : 0),
+          0
+        ) + target.appliance.wattage;
+
+      if (projectedPower > MAX_STRIP_POWER_W) {
+        const currentVoltage =
+          s.voltageHistory[s.voltageHistory.length - 1]?.voltage ?? s.country.nominalVoltage;
+        executeSafetyTrip(
+          'OVERLOAD',
+          `${projectedPower.toLocaleString('en-US')} W`,
+          clock.formattedFull,
+          `S${socketId} ${target.appliance.shortName} + Active Load`,
+          {
+            voltageV: currentVoltage,
+            temperatureC: s.plugTemperatureC,
+            powerW: projectedPower,
+          }
+        );
+        return;
+      }
+
+      setSockets((prev) =>
+        prev.map((sock) =>
+          sock.socketId === socketId
+            ? {
+                ...sock,
+                isOn: true,
+                activeDurationSeconds: 0,
+                activeSessionKwh: 0,
+              }
+            : sock
+        )
+      );
+    },
+    [executeSafetyTrip, pushNotification]
+  );
+
+  const setSocketCutoffTimer = useCallback(
+    (socketId: SocketId, minutes: number | null) => {
+      const s = stateRef.current;
+      const clock = decodeClock(s.clockSeconds);
+      const target = s.sockets.find((sock) => sock.socketId === socketId);
+      if (!target) return;
+
+      if (minutes === null || minutes <= 0) {
+        setSockets((prev) =>
+          prev.map((sock) =>
+            sock.socketId === socketId
+              ? { ...sock, autoCutoffMinutes: null, remainingCutoffSeconds: null }
+              : sock
+          )
+        );
+        return;
+      }
+
+      if (s.isSafetyLocked) {
+        pushNotification(
+          'Safety Lockout Active',
+          'Reset safety lock before setting a socket timer.',
+          'critical',
+          clock.formattedFull
+        );
+        return;
+      }
+
+      // If socket is currently OFF, turning it ON checks combined load
+      if (!target.isOn) {
+        const projectedPower =
+          s.sockets.reduce(
+            (sum, sock) => sum + (sock.isOn ? sock.appliance.wattage : 0),
+            0
+          ) + target.appliance.wattage;
+        if (projectedPower > MAX_STRIP_POWER_W) {
+          const currentVoltage =
+            s.voltageHistory[s.voltageHistory.length - 1]?.voltage ?? s.country.nominalVoltage;
+          executeSafetyTrip(
+            'OVERLOAD',
+            `${projectedPower.toLocaleString('en-US')} W`,
+            clock.formattedFull,
+            `S${socketId} ${target.appliance.shortName} + Active Load`,
+            {
+              voltageV: currentVoltage,
+              temperatureC: s.plugTemperatureC,
+              powerW: projectedPower,
+            }
+          );
+          return;
+        }
+      }
+
+      setSockets((prev) =>
+        prev.map((sock) =>
+          sock.socketId === socketId
+            ? {
+                ...sock,
+                isOn: true,
+                autoCutoffMinutes: minutes,
+                remainingCutoffSeconds: minutes * 60,
+              }
+            : sock
+        )
+      );
+    },
+    [executeSafetyTrip, pushNotification]
+  );
 
   const jumpToTime = useCallback(
     (hour: number, minute: number) => {
@@ -509,14 +654,30 @@ export function useSimulatorEngine() {
       const enteringOffPeak = isOffPeakMinute(targetMinuteOfDay, s.country);
       const targetClock = decodeClock(nextSeconds);
 
-      if (s.autoOnOffPeak && enteringOffPeak && s.relayState === 'OFF') {
-        setRelayState('ON');
-        pushNotification(
-          'Off-Peak Auto-On Activated',
-          `Entered ${s.country.shortName} off-peak window (${s.country.offPeakWindowLabel}). ${s.appliance.name} turned ON.`,
-          'info',
-          targetClock.formattedFull
-        );
+      if (s.autoOnOffPeak && enteringOffPeak && !s.isSafetyLocked) {
+        const s1 = s.sockets.find((sock) => sock.socketId === 1);
+        if (s1 && !s1.isOn) {
+          const projected =
+            s.sockets.reduce(
+              (sum, sock) => sum + (sock.isOn ? sock.appliance.wattage : 0),
+              0
+            ) + s1.appliance.wattage;
+          if (projected <= MAX_STRIP_POWER_W) {
+            setSockets((prev) =>
+              prev.map((sock) =>
+                sock.socketId === 1
+                  ? { ...sock, isOn: true, activeDurationSeconds: 0, activeSessionKwh: 0 }
+                  : sock
+              )
+            );
+            pushNotification(
+              'Off-Peak Auto-On Activated',
+              `Entered ${s.country.shortName} off-peak (${s.country.offPeakWindowLabel}). Socket 1 (Water Heater) turned ON.`,
+              'info',
+              targetClock.formattedFull
+            );
+          }
+        }
       }
     },
     [pushNotification]
@@ -569,16 +730,14 @@ export function useSimulatorEngine() {
 
   const resetDemo = useCallback(() => {
     setCountryCode('ID');
-    setApplianceId('water_heater');
-    setRelayState('ON');
+    setSockets(createInitialSockets());
+    setIsSafetyLocked(false);
     setClockSeconds(INITIAL_CLOCK_SECONDS);
     setSpeedMultiplier(60);
     setFaultInjection('NONE');
     setPlugTemperatureC(INITIAL_PLUG_TEMP_C);
-    setTimerRemainingSeconds(null);
     setAutoOnOffPeak(true);
     setSchedules(DEFAULT_SCHEDULES);
-    setSessionKwh(0.42);
     setNotifications([]);
     setActiveBanner(null);
     setWhatsappMessages([]);
@@ -595,7 +754,6 @@ export function useSimulatorEngine() {
       const nextTick = s.tickCount + 1;
       setTickCount(nextTick);
 
-      // Compute instantaneous voltage for sparkline
       let liveVoltage = s.country.nominalVoltage + Math.sin(nextTick * 0.45) * 1.1;
       let isVoltageAnomaly = false;
 
@@ -624,62 +782,124 @@ export function useSimulatorEngine() {
 
       const prevClock = decodeClock(prevClockSeconds);
       const nextClock = decodeClock(nextClockSeconds);
+      const isNewDay = prevClock.dayIndex !== nextClock.dayIndex;
 
-      // Realistic thermal simulation (SNI IEC 60884-1)
+      const totalActiveWatts = s.sockets.reduce(
+        (sum, sock) => sum + (sock.isOn ? sock.appliance.wattage : 0),
+        0
+      );
+
+      // Realistic combined thermal physics (SNI IEC 60884-1)
+      let updatedTemp = s.plugTemperatureC;
       if (s.faultInjection === 'OVERHEAT') {
-        setPlugTemperatureC(74.6 + Math.sin(nextTick * 0.5) * 0.4);
+        updatedTemp = 74.6 + Math.sin(nextTick * 0.5) * 0.4;
+        setPlugTemperatureC(Number(updatedTemp.toFixed(1)));
       } else {
-        const targetTemp =
-          s.relayState === 'ON'
-            ? getSteadyStateTempForWattage(s.appliance.wattage)
-            : AMBIENT_PLUG_TEMP_C;
-        const speedFactor = Math.min(0.14, 0.008 + Math.log10(Math.max(1, s.speedMultiplier)) * 0.028);
-        const nextTemp = s.plugTemperatureC + (targetTemp - s.plugTemperatureC) * speedFactor;
-        setPlugTemperatureC(Number(nextTemp.toFixed(1)));
+        const targetTemp = getSteadyStateTempForTotalPower(totalActiveWatts);
+        const speedFactor = Math.min(
+          0.14,
+          0.008 + Math.log10(Math.max(1, s.speedMultiplier)) * 0.028
+        );
+        updatedTemp = Number(
+          (s.plugTemperatureC + (targetTemp - s.plugTemperatureC) * speedFactor).toFixed(1)
+        );
+        setPlugTemperatureC(updatedTemp);
+
+        // Auto-trip if natural combined load pushes plug temperature >= 70C
+        if (updatedTemp >= 70 && !s.isSafetyLocked && totalActiveWatts > 0) {
+          const activeNames =
+            s.sockets
+              .filter((sock) => sock.isOn)
+              .map((sock) => `S${sock.socketId} ${sock.appliance.shortName}`)
+              .join(', ') || '4-Socket Strip';
+          executeSafetyTrip(
+            'OVERHEAT',
+            `${updatedTemp.toFixed(1)} °C`,
+            nextClock.formattedFull,
+            activeNames,
+            {
+              voltageV: liveVoltage,
+              temperatureC: updatedTemp,
+              powerW: totalActiveWatts,
+            }
+          );
+          return;
+        }
       }
 
-      // Accumulate session energy if relay is ON
-      if (s.relayState === 'ON') {
-        const addedKwh = (s.appliance.wattage * deltaSimSeconds) / 3600000;
-        setSessionKwh((prev) => prev + addedKwh);
+      // Update per-socket duration, activeSessionKwh, dailyKwh, and countdown timers
+      const expiredSocketLabels: string[] = [];
+      setSockets((prev) =>
+        prev.map((sock) => {
+          const baseDaily = isNewDay ? 0 : sock.dailyKwh;
+          if (!sock.isOn) {
+            return isNewDay ? { ...sock, dailyKwh: 0 } : sock;
+          }
+
+          const addedKwh = (sock.appliance.wattage * deltaSimSeconds) / 3600000;
+          const nextRemaining =
+            sock.remainingCutoffSeconds !== null
+              ? sock.remainingCutoffSeconds - deltaSimSeconds
+              : null;
+
+          if (nextRemaining !== null && nextRemaining <= 0) {
+            expiredSocketLabels.push(`S${sock.socketId} (${sock.appliance.shortName})`);
+            return {
+              ...sock,
+              isOn: false,
+              activeDurationSeconds: 0,
+              activeSessionKwh: 0,
+              dailyKwh: baseDaily + addedKwh,
+              autoCutoffMinutes: null,
+              remainingCutoffSeconds: null,
+            };
+          }
+
+          return {
+            ...sock,
+            activeDurationSeconds: sock.activeDurationSeconds + deltaSimSeconds,
+            activeSessionKwh: sock.activeSessionKwh + addedKwh,
+            dailyKwh: baseDaily + addedKwh,
+            remainingCutoffSeconds: nextRemaining,
+          };
+        })
+      );
+
+      if (expiredSocketLabels.length > 0) {
+        pushNotification(
+          'Socket Timer Auto-Cutoff',
+          `Countdown completed. ${expiredSocketLabels.join(', ')} switched OFF.`,
+          'info',
+          nextClock.formattedFull
+        );
       }
 
-      // Priority 2: Countdown timer auto-cutoff
-      if (s.relayState === 'ON' && s.timerRemainingSeconds !== null) {
-        const remaining = s.timerRemainingSeconds - deltaSimSeconds;
-        if (remaining <= 0) {
-          setTimerRemainingSeconds(null);
-          setRelayState('OFF');
+      if (s.isSafetyLocked) return;
+
+      // Priority 3: Off-Peak Auto-On entry detection (Socket 1 Water Heater)
+      const prevOffPeak = isOffPeakMinute(prevClock.minuteOfDay, s.country);
+      const nextOffPeak = isOffPeakMinute(nextClock.minuteOfDay, s.country);
+      if (s.autoOnOffPeak && !prevOffPeak && nextOffPeak) {
+        const s1 = s.sockets.find((sock) => sock.socketId === 1);
+        if (s1 && !s1.isOn && totalActiveWatts + s1.appliance.wattage <= MAX_STRIP_POWER_W) {
+          setSockets((prev) =>
+            prev.map((sock) =>
+              sock.socketId === 1
+                ? { ...sock, isOn: true, activeDurationSeconds: 0, activeSessionKwh: 0 }
+                : sock
+            )
+          );
           pushNotification(
-            'Timer Auto-Cutoff Complete',
-            `Countdown finished. ${s.appliance.name} was automatically switched OFF.`,
+            'Off-Peak Auto-On Triggered',
+            `Entered ${s.country.shortName} off-peak (${s.country.offPeakWindowLabel}). Socket 1 (Water Heater) turned ON.`,
             'info',
             nextClock.formattedFull
           );
           return;
-        } else {
-          setTimerRemainingSeconds(remaining);
         }
       }
 
-      // Do not auto-turn ON if safety lockout is active
-      if (s.relayState === 'TRIPPED') return;
-
-      // Priority 3: Off-Peak Auto-On entry detection
-      const prevOffPeak = isOffPeakMinute(prevClock.minuteOfDay, s.country);
-      const nextOffPeak = isOffPeakMinute(nextClock.minuteOfDay, s.country);
-      if (s.autoOnOffPeak && !prevOffPeak && nextOffPeak && s.relayState === 'OFF') {
-        setRelayState('ON');
-        pushNotification(
-          'Off-Peak Auto-On Triggered',
-          `Entered ${s.country.shortName} off-peak window (${s.country.offPeakWindowLabel}). ${s.appliance.name} turned ON.`,
-          'info',
-          nextClock.formattedFull
-        );
-        return;
-      }
-
-      // Priority 4: Daily Schedule Start/End match
+      // Priority 4: Daily Schedule Start/End match per Socket
       const prevAbsMinute = Math.floor(prevClockSeconds / 60);
       const nextAbsMinute = Math.floor((prevClockSeconds + deltaSimSeconds) / 60);
       if (nextAbsMinute > prevAbsMinute) {
@@ -693,22 +913,45 @@ export function useSimulatorEngine() {
             if (!slot.enabled || !slot.days.includes(checkDay)) continue;
             const startMin = parseTimeToMinutes(slot.startTime);
             const endMin = parseTimeToMinutes(slot.endTime);
+            const targetSock = s.sockets.find((sock) => sock.socketId === slot.socketId);
+            if (!targetSock) continue;
 
-            if (checkMinOfDay === startMin && s.relayState === 'OFF') {
-              setRelayState('ON');
-              pushNotification(
-                'Schedule Auto-On',
-                `${slot.label} started at ${slot.startTime}. ${s.appliance.name} turned ON.`,
-                'info',
-                nextClock.formattedFull
-              );
+            if (checkMinOfDay === startMin && !targetSock.isOn) {
+              if (totalActiveWatts + targetSock.appliance.wattage <= MAX_STRIP_POWER_W) {
+                setSockets((prev) =>
+                  prev.map((sock) =>
+                    sock.socketId === slot.socketId
+                      ? { ...sock, isOn: true, activeDurationSeconds: 0, activeSessionKwh: 0 }
+                      : sock
+                  )
+                );
+                pushNotification(
+                  'Schedule Auto-On',
+                  `${slot.label} started at ${slot.startTime}. Socket ${slot.socketId} (${targetSock.appliance.shortName}) turned ON.`,
+                  'info',
+                  nextClock.formattedFull
+                );
+              }
               return;
             }
-            if (checkMinOfDay === endMin && s.relayState === 'ON') {
-              setRelayState('OFF');
+            if (checkMinOfDay === endMin && targetSock.isOn) {
+              setSockets((prev) =>
+                prev.map((sock) =>
+                  sock.socketId === slot.socketId
+                    ? {
+                        ...sock,
+                        isOn: false,
+                        activeDurationSeconds: 0,
+                        activeSessionKwh: 0,
+                        autoCutoffMinutes: null,
+                        remainingCutoffSeconds: null,
+                      }
+                    : sock
+                )
+              );
               pushNotification(
                 'Schedule Auto-Off',
-                `${slot.label} ended at ${slot.endTime}. ${s.appliance.name} switched OFF.`,
+                `${slot.label} ended at ${slot.endTime}. Socket ${slot.socketId} (${targetSock.appliance.shortName}) switched OFF.`,
                 'info',
                 nextClock.formattedFull
               );
@@ -720,7 +963,7 @@ export function useSimulatorEngine() {
     }, TICK_MS);
 
     return () => window.clearInterval(timer);
-  }, [pushNotification]);
+  }, [executeSafetyTrip, pushNotification]);
 
   const clock = useMemo(() => decodeClock(clockSeconds), [clockSeconds]);
   const isCurrentlyOffPeak = useMemo(
@@ -737,21 +980,38 @@ export function useSimulatorEngine() {
     [plugTemperatureC]
   );
 
-  const activePowerW = relayState === 'ON' ? appliance.wattage : 0;
-  const activeCurrentA =
-    relayState === 'ON' && liveVoltage > 0 ? activePowerW / liveVoltage : 0;
+  const activeSockets = useMemo(() => sockets.filter((s) => s.isOn), [sockets]);
+  const totalPowerWatts = useMemo(
+    () => activeSockets.reduce((sum, s) => sum + s.appliance.wattage, 0),
+    [activeSockets]
+  );
+  const totalCurrentAmps = useMemo(
+    () => (liveVoltage > 0 ? totalPowerWatts / liveVoltage : 0),
+    [totalPowerWatts, liveVoltage]
+  );
+  const totalDailyKwh = useMemo(
+    () => sockets.reduce((sum, s) => sum + s.dailyKwh, 0),
+    [sockets]
+  );
+
+  const relayState: RelayState = isSafetyLocked
+    ? 'TRIPPED'
+    : activeSockets.length > 0
+      ? 'ON'
+      : 'OFF';
 
   const monthlyProjection = useMemo(
-    () => calculateMonthlyProjection(appliance, country, schedules, autoOnOffPeak),
-    [appliance, country, schedules, autoOnOffPeak]
+    () => calculateMultiSocketMonthlyProjection(sockets, country, schedules, autoOnOffPeak),
+    [sockets, country, schedules, autoOnOffPeak]
   );
 
   return {
     // Core state
     countryCode,
     country,
-    applianceId,
-    appliance,
+    sockets,
+    activeSockets,
+    isSafetyLocked,
     relayState,
     clock,
     isCurrentlyOffPeak,
@@ -761,32 +1021,30 @@ export function useSimulatorEngine() {
     thermalStatus,
     voltageStatus,
     weather,
-    timerRemainingSeconds,
     autoOnOffPeak,
     schedules,
-    sessionKwh,
     notifications,
     activeBanner,
     whatsappMessages,
     anomalyLogs,
     voltageHistory,
 
-    // Telemetry
+    // Aggregate Telemetry
     liveVoltage,
-    activePowerW,
-    activeCurrentA,
+    totalPowerWatts,
+    totalCurrentAmps,
+    totalDailyKwh,
     monthlyProjection,
 
     // Actions
     selectCountry,
-    setApplianceId,
-    toggleRelay,
+    toggleSocket,
+    setSocketCutoffTimer,
     resetSafetyLock,
     setSpeedMultiplier,
     jumpToTime,
     triggerFault,
     setWeatherMode,
-    setCountdownMinutes,
     setAutoOnOffPeak,
     addSchedule,
     toggleSchedule,

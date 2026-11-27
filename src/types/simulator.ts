@@ -15,24 +15,38 @@ export interface CountryTariffConfig {
   nominalVoltage: number;
   peakRate: number;
   offPeakRate: number;
-  offPeakStartMinutes: number; // minutes from 00:00 (e.g., 22*60 = 1320, 0*60+30 = 30)
-  offPeakEndMinutes: number; // minutes from 00:00 (e.g., 5*60 = 300, 7*60+30 = 450)
+  offPeakStartMinutes: number;
+  offPeakEndMinutes: number;
   offPeakWindowLabel: string;
   peakWindowLabel: string;
   peakCarbonGPerKwh: number;
   offPeakCarbonGPerKwh: number;
 }
 
+export type SocketId = 1 | 2 | 3 | 4;
+
 export type ApplianceId = 'water_heater' | 'ac' | 'dispenser' | 'charger';
 
 export interface AppliancePreset {
   id: ApplianceId;
+  socketId: SocketId;
   name: string;
   shortName: string;
   wattage: number;
   category: string;
   description: string;
   defaultDailyHours: number;
+}
+
+export interface SocketState {
+  socketId: SocketId;
+  appliance: AppliancePreset;
+  isOn: boolean;
+  activeDurationSeconds: number;
+  activeSessionKwh: number;
+  dailyKwh: number;
+  autoCutoffMinutes: number | null;
+  remainingCutoffSeconds: number | null;
 }
 
 export type RelayState = 'ON' | 'OFF' | 'TRIPPED';
@@ -70,6 +84,7 @@ export interface WeatherState {
 
 export interface ScheduleSlot {
   id: string;
+  socketId: SocketId;
   days: number[]; // 0 = Sun, 1 = Mon, ..., 6 = Sat
   startTime: string; // "HH:MM"
   endTime: string; // "HH:MM"

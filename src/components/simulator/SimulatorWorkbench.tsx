@@ -27,8 +27,8 @@ export function SimulatorWorkbench({ engine }: SimulatorWorkbenchProps) {
             Test Real-Time Load Shifting, Safety &amp; Thermal Protection Live
           </h2>
           <p className="mt-3 text-base text-[#6E6E73] leading-relaxed">
-            Accelerate virtual time, switch between 4 household appliances on a
-            single smart socket, test SPLN 1:1995 voltage and SNI IEC 60884-1
+            Accelerate virtual time, toggle 4 independent smart sockets
+            simultaneously, test SPLN 1:1995 voltage and SNI IEC 60884-1
             thermal limits, simulate extreme weather alerts, and inspect
             EcoShift Guard WhatsApp notifications.
           </p>

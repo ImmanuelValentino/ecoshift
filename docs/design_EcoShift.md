@@ -66,9 +66,9 @@ When plug temperature enters `Warm (56°C to 69°C)` or `Overheat (>= 70°C)`, t
      * Weather Protection Controls (`Live API`, `Clear (Normal)`, `Heavy Rain`, `Thunderstorm`) with active city weather pill.
    * **Extreme Weather Warning Banner:** Appears cleanly above the 3-column workspace whenever `Heavy Rain` or `Thunderstorm` is active, showing lightning/surge protection standby status.
    * **Three-Column Interactive Workspace (`w-full max-w-[1720px]` container, `grid-cols-1 lg:grid-cols-[1.15fr_390px_1.15fr] xl:grid-cols-[1.2fr_410px_1.2fr] gap-5`):**
-     * **Left Column (`1.15fr` / `1.2fr`): Interactive Plug-In Hardware Stage** (Day/Night room, smart plug with reduced thermal glow & live `°C` pill, animated cable, 4 appliances, and Appliance Switcher).
-     * **Center Column (`390px` / `410px`): Companion Smartphone App + WhatsApp Mockup** (Top WhatsApp/Alert push banner, segmented switcher between `Controls` and `WhatsApp`, master relay toggle, live temperature badge, countdown timer, off-peak auto-on switch, daily schedules, and `EcoShift Guard` WhatsApp chat feed).
-     * **Right Column (`1.15fr` / `1.2fr`): Country Tariff, Telemetry and Impact** (Country selector, live voltage sparkline with `198V–231V` safe band and `232V–242V` warning band, Voltage/Current/Power/Temperature tiles, monthly bill bar, off-peak savings, carbon reduction, and anomaly log).
+     * **Left Column (`1.15fr` / `1.2fr`): Compact 4-Socket Hardware Stage (No-Scroll on Laptop)** (Day/Night room, 4-socket smart power strip with reduced thermal glow & live `°C` pill, animated cables, 4 fixed appliances `S1–S4`, and tap-to-toggle relay).
+     * **Center Column (`390px` / `410px`): Companion Smartphone App with 4-Tab Bottom Navigation Bar** (Top WhatsApp/Alert push banner, permanent Bottom Navigation Bar with `Dashboard`, `Socket` + active badge, `Schedule`, and `WhatsApp` + unread badge).
+     * **Right Column (`1.15fr` / `1.2fr`): Country Tariff, Aggregate Telemetry and Impact** (Country selector, live voltage sparkline with `198V–231V` safe band and `232V–242V` warning band, Voltage/Total Amp/Total Load/Plug Temp tiles, 4-socket daily kWh breakdown, monthly bill bar, off-peak savings, carbon reduction, and anomaly log).
 5. **Sustainability Business Model Canvas (BMC) Grid (`#FFFFFF` Section, `w-full max-w-[1600px]`):**
    * Clean 6-card Apple-style bento grid without unit pricing.
 6. **Layout Alignment & Overflow Prevention:**

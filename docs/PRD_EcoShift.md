@@ -3,8 +3,8 @@
 
 | Metadata | Detail |
 | :--- | :--- |
-| **Product Name** | EcoShift Home (Single-Socket Smart Plug Simulator) |
-| **Document Version** | 2.0 |
+| **Product Name** | EcoShift Home (4-Socket Independent Smart Power Strip Simulator) |
+| **Document Version** | 3.0 |
 | **Target Audience** | International Sustainability Business Model Canvas (BMC) Competition Judges |
 | **Website Format** | Pitch Landing Page + Embedded Interactive Web Simulator |
 | **System Architecture** | Client-Side Interactive Web Simulator with Optional Google Weather API Integration |
@@ -20,12 +20,12 @@ This web application serves as a **live interactive pitch platform** for an **In
 
 ### 2.1 In-Scope (Must Build)
 * **Pitch Landing Page:** Narrative sections tailored for international sustainability judges (Hero, Problem/Grid Challenge, 3-Step Solution, Live Interactive Simulator, and Sustainability BMC Overview).
-* **Single-Socket Hardware Twin (1 Outlet):** Visual and logical simulation of **1 smart plug socket** connected to one selectable household appliance at a time.
-* **4 Preset Household Appliances:**
-  1. **Water Heater** (`1,500 W`)
-  2. **AC (Air Conditioner)** (`900 W`)
-  3. **Dispenser (Water Dispenser)** (`350 W`)
-  4. **Charger (Laptop/Phone Fast Charger)** (`65 W`)
+* **4-Socket Independent Hardware Twin (`Socket 1` to `Socket 4`):** Visual and logical simulation of **4 independent smart sockets**, each permanently paired with 1 household appliance:
+  1. **Socket 1:** `Water Heater` (`1,500 W`)
+  2. **Socket 2:** `Air Conditioner (AC)` (`900 W`)
+  3. **Socket 3:** `Water Dispenser` (`350 W`)
+  4. **Socket 4:** `Laptop Charger` (`65 W`)
+* **Smartphone Mockup with 4-Tab Bottom Navigation Bar:** `Dashboard` (Active Sockets summary, Today's kWh + per-socket breakdown, 30-Day Monthly Bill, Adaptive Off-Peak card, Live Telemetry), `Socket` (4 independent socket cards with ON/OFF toggle, active session duration, session kWh, and optional per-socket auto-cutoff timer), `Schedule` (daily schedules bound to `Socket 1`–`4` + Off-Peak Auto-On), and `WhatsApp` (`EcoShift Guard` alerts).
 * **Core Smart Plug Features:**
   1. **Auto-On and Auto-Cutoff:** Rule-based relay control (Auto-On via Daily Schedule or Off-Peak Hour entry; Auto-Cutoff via Countdown Timer, Overload, Voltage Anomaly, or Thermal Overheat).
   2. **Daily On/Off Scheduling:** Multi-slot schedule configuration across days of the week (`Monday to Sunday`).
@@ -37,7 +37,6 @@ This web application serves as a **live interactive pitch platform** for an **In
 
 ### 2.2 Out-of-Scope (Strictly Excluded)
 * **No Hardware Connection:** Zero WebSocket, MQTT, Bluetooth, or Serial connections to real ESP32 devices.
-* **No Multi-Socket Strip:** Do not build a 4-outlet power strip; strictly **1 socket**.
 * **No Water-Saving Hardware:** Exclude *Eco-Shower Head* and *Smart Water Meter* from this product scope.
 * **No Pricing / BOM / ROI Tables:** Omit hardware unit pricing, cost of goods sold, and financial payback pricing.
 * **No "Auto-Save Mode" Toggle:** Do not include a generic "Auto Eco/Save Mode" switch.

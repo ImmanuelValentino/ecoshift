@@ -3,6 +3,7 @@ import {
   CountryTariffConfig,
   MonthlyProjection,
   ScheduleSlot,
+  SocketState,
 } from '../types/simulator';
 
 export function parseTimeToMinutes(timeStr: string): number {
@@ -132,6 +133,67 @@ export function calculateMonthlyProjection(
     (monthlyOffPeakKwh * (country.peakCarbonGPerKwh - country.offPeakCarbonGPerKwh)) / 1000;
 
   const peakLoadShavedKw = dailyOffPeakHours > 0 ? appliance.wattage / 1000 : 0;
+
+  return {
+    dailyPeakHours,
+    dailyOffPeakHours,
+    monthlyPeakKwh,
+    monthlyOffPeakKwh,
+    monthlyTotalKwh,
+    peakCost,
+    offPeakCost,
+    totalMonthlyBill,
+    offPeakSavings,
+    co2AvoidedKg,
+    peakLoadShavedKw,
+    usedScheduleBasis,
+  };
+}
+
+export function calculateMultiSocketMonthlyProjection(
+  sockets: SocketState[],
+  country: CountryTariffConfig,
+  schedules: ScheduleSlot[],
+  autoOnOffPeak: boolean
+): MonthlyProjection {
+  let monthlyPeakKwh = 0;
+  let monthlyOffPeakKwh = 0;
+  let dailyPeakHours = 0;
+  let dailyOffPeakHours = 0;
+  let peakLoadShavedKw = 0;
+  let usedScheduleBasis = false;
+
+  for (const sock of sockets) {
+    const sockSchedules = schedules.filter((s) => s.socketId === sock.socketId);
+    const proj = calculateMonthlyProjection(
+      sock.appliance,
+      country,
+      sockSchedules,
+      autoOnOffPeak
+    );
+    monthlyPeakKwh += proj.monthlyPeakKwh;
+    monthlyOffPeakKwh += proj.monthlyOffPeakKwh;
+    dailyPeakHours += proj.dailyPeakHours;
+    dailyOffPeakHours += proj.dailyOffPeakHours;
+    if (proj.usedScheduleBasis) {
+      usedScheduleBasis = true;
+    }
+    if (sock.isOn || proj.dailyOffPeakHours > 0) {
+      peakLoadShavedKw += proj.peakLoadShavedKw;
+    }
+  }
+
+  const monthlyTotalKwh = monthlyPeakKwh + monthlyOffPeakKwh;
+  const peakCost = monthlyPeakKwh * country.peakRate;
+  const offPeakCost = monthlyOffPeakKwh * country.offPeakRate;
+  const totalMonthlyBill = peakCost + offPeakCost;
+
+  const offPeakSavings = country.isTOU
+    ? monthlyOffPeakKwh * (country.peakRate - country.offPeakRate)
+    : 0;
+
+  const co2AvoidedKg =
+    (monthlyOffPeakKwh * (country.peakCarbonGPerKwh - country.offPeakCarbonGPerKwh)) / 1000;
 
   return {
     dailyPeakHours,

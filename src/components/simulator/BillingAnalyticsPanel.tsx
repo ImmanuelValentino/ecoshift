@@ -14,9 +14,11 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
     countryCode,
     country,
     selectCountry,
+    sockets,
     liveVoltage,
-    activeCurrentA,
-    activePowerW,
+    totalCurrentAmps,
+    totalPowerWatts,
+    totalDailyKwh,
     plugTemperatureC,
     thermalStatus,
     voltageStatus,
@@ -142,15 +144,15 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
             </span>
           </div>
           <div className="bg-[#F5F5F7] rounded-xl p-2 text-center">
-            <span className="text-[10px] text-[#6E6E73] block">Current</span>
+            <span className="text-[10px] text-[#6E6E73] block">Total Amp</span>
             <span className="font-mono text-xs sm:text-sm font-bold text-[#1D1D1F] tabular-nums">
-              {activeCurrentA.toFixed(2)} A
+              {totalCurrentAmps.toFixed(2)} A
             </span>
           </div>
           <div className="bg-[#F5F5F7] rounded-xl p-2 text-center">
-            <span className="text-[10px] text-[#6E6E73] block">Power</span>
+            <span className="text-[10px] text-[#6E6E73] block">Total Load</span>
             <span className="font-mono text-xs sm:text-sm font-bold text-[#047857] tabular-nums">
-              {activePowerW.toLocaleString('en-US')} W
+              {totalPowerWatts.toLocaleString('en-US')} W
             </span>
           </div>
           <div className="bg-[#F5F5F7] rounded-xl p-2 text-center">
@@ -302,6 +304,30 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
             <p className="text-[10px] text-[#6E6E73] mt-0.5">
               {country.peakCarbonGPerKwh} to {country.offPeakCarbonGPerKwh} g/kWh
             </p>
+          </div>
+        </div>
+
+        {/* Per-Socket Daily Breakdown */}
+        <div className="bg-[#F5F5F7] rounded-xl p-2.5 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-semibold text-[#1D1D1F]">
+              Today&apos;s 4-Socket Usage
+            </span>
+            <span className="font-mono font-bold text-[#047857] tabular-nums">
+              {totalDailyKwh.toFixed(3)} kWh
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5 text-center font-mono text-[10px] tabular-nums">
+            {sockets.map((sock) => (
+              <div key={sock.socketId} className="bg-white rounded-lg py-1 px-1 border border-black/[0.05]">
+                <span className="text-[#6E6E73] block text-[9px]">
+                  S{sock.socketId} {sock.appliance.shortName.split(' ')[0]}
+                </span>
+                <span className="font-bold text-[#1D1D1F]">
+                  {sock.dailyKwh.toFixed(2)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 

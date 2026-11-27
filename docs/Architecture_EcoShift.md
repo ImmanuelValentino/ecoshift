@@ -46,6 +46,9 @@
 
 ## 3. Core Data Models (`src/types/simulator.ts`)
 
+* **SocketId & SocketState (`src/types/simulator.ts`):** Models 4 independent sockets (`1 | 2 | 3 | 4`), each permanently paired with its fixed appliance (`Water Heater 1,500W`, `AC 900W`, `Dispenser 350W`, `Laptop Charger 65W`), tracking `isOn`, `activeDurationSeconds`, `activeSessionKwh`, `dailyKwh`, `autoCutoffMinutes`, and `remainingCutoffSeconds`. Turning a socket OFF resets its active session duration and kWh to `0`; `dailyKwh` resets on simulated day rollover (`00:00`).
+* **Combined Load & Thermal Physics:** `totalPowerWatts` sums all active sockets (`isOn === true`). Combined loads exceeding `2,400 W` trigger an immediate `OVERLOAD` trip across all sockets. Sustained high combined loads raise `plugTemperatureC` faster toward the `70°C` SNI IEC 60884-1 limit.
+* **ScheduleSlot:** Binds each daily schedule to a specific `socketId: 1 | 2 | 3 | 4`.
 * **CountryTariffConfig:** Adds city coordinates (`city`, `latitude`, `longitude`) for weather lookup alongside `nominalVoltage`, `peakRate`, `offPeakRate`, `offPeakStartMinutes`, `offPeakEndMinutes`, `peakCarbonGPerKwh`, and `offPeakCarbonGPerKwh`.
 * **FaultInjection:** `'NONE' | 'UNDERVOLTAGE' | 'OVERVOLTAGE' | 'OVERLOAD' | 'OVERHEAT'`.
 * **AnomalyType:** `'UNDERVOLTAGE' | 'OVERVOLTAGE' | 'OVERLOAD' | 'OVERHEAT'`.

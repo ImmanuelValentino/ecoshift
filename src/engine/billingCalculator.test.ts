@@ -49,6 +49,7 @@ describe('billingCalculator', () => {
       [
         {
           id: 'uk-night',
+          socketId: 1,
           label: 'UK Economy 7 Heating',
           days: [0, 1, 2, 3, 4, 5, 6],
           startTime: '01:00',
