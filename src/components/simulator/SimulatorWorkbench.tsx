@@ -1,4 +1,4 @@
-import { CloudLightning, CloudRain, ShieldAlert } from 'lucide-react';
+import { BellOff, CloudLightning, CloudRain, ShieldAlert } from 'lucide-react';
 import { SimulatorEngine } from '../../engine/useSimulatorEngine';
 import { BillingAnalyticsPanel } from './BillingAnalyticsPanel';
 import { DemoControlBar } from './DemoControlBar';
@@ -10,7 +10,7 @@ interface SimulatorWorkbenchProps {
 }
 
 export function SimulatorWorkbench({ engine }: SimulatorWorkbenchProps) {
-  const { weather } = engine;
+  const { weather, isAlarmActive, alarmReason, stopAndResetAlarm } = engine;
   const isStorm = weather.condition === 'THUNDERSTORM';
   const isHeavyRain = weather.condition === 'HEAVY_RAIN';
   const showWeatherBanner = isStorm || isHeavyRain;
@@ -41,6 +41,34 @@ export function SimulatorWorkbench({ engine }: SimulatorWorkbenchProps) {
         <div className="bg-[#F5F5F7] rounded-[32px] border border-black/[0.06] p-4 sm:p-6 space-y-5">
           {/* Top Scenario Control Strip */}
           <DemoControlBar engine={engine} />
+
+          {/* Emergency Alarm Alert Banner (Shake + Red Pulsing Glow) */}
+          {isAlarmActive && (
+            <div
+              role="alert"
+              className="alarm-active-card rounded-2xl border-2 border-red-500 bg-red-50/85 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-[#991B1B]"
+            >
+              <div className="flex items-center gap-2.5">
+                <ShieldAlert className="w-5 h-5 shrink-0 text-[#DC2626] animate-pulse" />
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-[#DC2626]">
+                    Emergency Safety Alarm Triggered
+                  </p>
+                  <p className="text-xs font-medium text-[#7F1D1D] mt-0.5">
+                    {alarmReason ?? 'Critical electrical, thermal, or weather hazard detected.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={stopAndResetAlarm}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#DC2626] text-white hover:bg-red-700 transition-colors cursor-pointer shadow-xs"
+              >
+                <BellOff className="w-3.5 h-3.5" />
+                Reset Alarm
+              </button>
+            </div>
+          )}
 
           {/* Extreme Weather Protection Banner */}
           {showWeatherBanner && (

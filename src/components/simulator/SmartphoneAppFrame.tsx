@@ -79,6 +79,8 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
     periodAnalytics,
     activeSockets,
     isSafetyLocked,
+    isAlarmActive,
+    alarmReason,
     faultInjection,
     liveVoltage,
     totalPowerWatts,
@@ -229,7 +231,13 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
   return (
     <div className="flex flex-col items-center justify-start w-full">
       {/* Sleek Modern Smartphone Bezel (Fixed Height Across All Tabs) */}
-      <div className="relative h-[690px] w-full max-w-[390px] mx-auto rounded-[40px] bg-[#F5F5F7] border-[8px] border-[#1D1D1F] shadow-xl overflow-hidden flex flex-col">
+      <div
+        className={`relative h-[690px] w-full max-w-[390px] mx-auto rounded-[40px] bg-[#F5F5F7] border-[8px] border-[#1D1D1F] shadow-xl overflow-hidden flex flex-col ${
+          isAlarmActive
+            ? 'alarm-active-card border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.4)]'
+            : ''
+        }`}
+      >
         {/* Top Mobile / WhatsApp Push Notification Banner Overlay (z-30) */}
         {activeBanner && (
           <div
@@ -304,6 +312,19 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
             <Battery className="w-3.5 h-3.5" />
           </div>
         </div>
+
+        {/* Red Emergency Alarm Bar inside Phone Top when Alarm Active */}
+        {isAlarmActive && (
+          <div
+            role="alert"
+            className="shrink-0 bg-[#DC2626] text-white px-3.5 py-2 flex items-center gap-2 text-[11px] font-semibold"
+          >
+            <ShieldAlert className="w-4 h-4 shrink-0 animate-pulse" />
+            <span className="truncate">
+              EMERGENCY: {alarmReason ?? 'Critical Safety Anomaly Detected'}
+            </span>
+          </div>
+        )}
 
         {/* 2. Scrollable Screen Body */}
         <div

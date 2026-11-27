@@ -3,26 +3,26 @@
 
 | Metadata | Detail |
 | :--- | :--- |
-| **Product Name** | EcoShift (4-Socket Smart Plug Product Showcase & Simulator) |
-| **Document Version** | 4.0 |
+| **Product Name** | Amartaloka (EcoShift Smart Plug Showcase & Simulator) |
+| **Document Version** | 5.0 |
 | **Target Audience** | Product Evaluation & Smart Home Energy Users |
 | **Website Format** | 3-Section Full-Page Scroll-Snap Product Showcase + Embedded Interactive Web Simulator |
-| **System Architecture** | Client-Side Interactive Web Simulator with Three.js 3D Product View & Optional Google Weather API |
+| **System Architecture** | Client-Side Interactive Web Simulator with Three.js 3D Product View, Web Audio Alarm & Optional Google Weather API |
 | **Primary Language** | English (International Product Standard) |
 
 ## 1. Executive Summary and Product Vision
 
-**EcoShift** is a plug-and-play smart plug solution designed to schedule everyday household appliances, shift heavy loads to off-peak hours, protect electronics from voltage and thermal anomalies in milliseconds, and monitor extreme weather surge risks.
+**Amartaloka (EcoShift Smart Plug)** delivers **One Plug, Triple Protection**: **Save Energy. Detect Problems. Prevent Risks.** It schedules daily household appliances, shifts heavy loads to off-peak hours, records electrical trip events (**TripTrace**), warns users before overheating (**HeatDot**), and triggers instant audiovisual alarms on grid, thermal, or severe weather hazards.
 
-This web application combines a clean Apple/Samsung-inspired **3-Section Product Launch Experience** (with an interactive **Three.js 3D Smart Socket**) and a self-contained **4-Socket Interactive Web Simulator** with full-page scroll-snap navigation.
+This web application combines a clean Apple/Samsung-inspired **3-Section Product Launch Experience** (with an interactive **Three.js 3D Amartaloka Smart Plug**) and a self-contained **Interactive Web Simulator** with full-page scroll-snap navigation.
 
 ## 2. Product Scope and Strict Guardrails
 
 ### 2.1 In-Scope (Must Build)
 * **3-Section Full-Page Scroll-Snap Website:**
-  1. **Section 1 (`Home`):** 100vh split-screen Hero featuring **EcoShift** (`Power, Perfected. Protection, Instant.`), a single `Try Live Simulator` CTA, and an interactive 360-degree **Three.js 3D Smart Socket** (`EcoShift3DSocket.tsx`).
-  2. **Section 2 (`Product & How It Works`):** Concise 100vh product overview (`Built for Everyday Appliances. Engineered for Safety.`) with 3 core product feature cards (`Smart Daily Scheduling`, `Instant Anomaly Cutoff`, `Real-Time Energy & WhatsApp Alerts`) and 3 usage steps (`01. Plug In`, `02. Set Schedule & Limits`, `03. Monitor & Control`).
-  3. **Section 3 (`Live Simulator`):** Full-width 3-column interactive simulator workbench plus footer.
+  1. **Section 1 (`Home`):** 100vh split-screen Hero featuring **Amartaloka** (`One Plug, Triple Protection.`), `One Plug, Triple Protection • Smart Home Plug` badge, a single `Try Live Simulator` CTA, and an interactive 360-degree **Three.js 3D Amartaloka Smart Plug** (`EcoShift3DSocket.tsx`).
+  2. **Section 2 (`Product & How It Works`):** Concise 100vh product overview (`Built for Everyday Appliances. Engineered for Safety.`) with Triple Protection pillars (**EcoShift** Smart Scheduling, **TripTrace** Event Diary, **HeatDot** Heat Warning) and 3 usage steps (**01. Plug In**, **02. Schedule & Protect**, **03. Monitor & Alert**).
+  3. **Section 3 (`Live Simulator`):** Full-width 3-column interactive simulator workbench with synchronized audiovisual emergency alarm (`alarmAudio.ts` + red shake alert) plus footer.
 * **4-Socket Independent Hardware Twin (`Socket 1` to `Socket 4`):** Visual and logical simulation of **4 independent smart sockets**, each permanently paired with 1 household appliance:
   1. **Socket 1:** `Water Heater` (`1,500 W`)
   2. **Socket 2:** `Air Conditioner (AC)` (`900 W`)
@@ -49,18 +49,19 @@ This web application combines a clean Apple/Samsung-inspired **3-Section Product
 ## 3. Website Section Structure (Full-Page Scroll Snap)
 
 1. **Fixed Minimalist Top Navigation Bar:**
-   * Brand identity (`EcoShift`), active-state navigation links (`Home`, `Product`, `Live Simulator`), active Country Tariff indicator, and a primary CTA button (`Try Live Simulator`).
+   * Brand identity (`Amartaloka` / `EcoShift Smart Plug`), active-state navigation links (`Home`, `Product`, `Live Simulator`), active Country Tariff indicator, and a primary CTA button (`Try Live Simulator`).
    * Paired with a minimalist right-side dot navigation indicator for quick section jumping.
 2. **Section 1 (`Home` — 100vh Split Screen):**
-   * Left column: `EcoShift` display title, tagline (`Power, Perfected. Protection, Instant.`), concise sub-tagline, and `Try Live Simulator` CTA.
-   * Right column: Interactive 360-degree Three.js 3D Smart Socket (`RoundedBoxGeometry` matte white body, Type-F front socket well with brass contacts and grounding clips, glowing emerald LED ring, side power button, rear metal prongs, soft studio shadow, and `Drag to rotate 360°` hint).
+   * Left column: `Amartaloka` display title, tagline (`One Plug, Triple Protection.`), sub-tagline (`Save Energy. Detect Problems. Prevent Risks...`), and `Try Live Simulator` CTA.
+   * Right column: Interactive 360-degree Three.js 3D Amartaloka Smart Plug (`ExtrudeGeometry` vertical rounded squircle `1 : 1.38`, high-res `Amartaloka` logo canvas texture with house + plug + green leaf, horizontal capsule pill green LED + `PointLight`, recessed Type-F cavity with brass rings, grounding clips, and vertical guide notches, rear 2 chrome prongs, soft studio shadow, and `Drag to rotate 360°` hint).
 3. **Section 2 (`Product` — 100vh Overview):**
    * Title: `Built for Everyday Appliances. Engineered for Safety.`
-   * Part A (3 Core Features): `Smart Daily Scheduling`, `Instant Anomaly Cutoff`, `Real-Time Energy & WhatsApp Alerts`.
-   * Part B (3 Usage Steps): `01. Plug In`, `02. Set Schedule & Limits`, `03. Monitor & Control`.
+   * Part A (Triple Protection Pillars): **EcoShift** (`Smart Scheduling`), **TripTrace** (`Event Diary`), **HeatDot** (`Heat Warning`).
+   * Part B (3 Usage Steps): `01. Plug In`, `02. Schedule & Protect`, `03. Monitor & Alert`.
 4. **Section 3 (`Live Simulator`):**
    * Full-width interactive command center containing:
-     * **Demo Scenario Control Bar** (Time Speed, Time Jump, Grid Fault and Overheat Triggers, Weather Mode Controls, Reset).
+     * **Demo Scenario Control Bar** (Time Speed, Time Jump, Grid Fault and Overheat Triggers, Weather Mode Controls, `Alarm Audio: ON / Muted` toggle, `Stop & Reset Alarm` button, Reset).
+     * **Emergency Safety Alarm Banner & Red Shake Alert:** Triggers synchronized Web Audio dual-tone siren (`880 Hz` / `660 Hz`), horizontal shake (`alarm-shake`), and pulsing red glow across the simulator banner, hardware strip, and smartphone bezel whenever a voltage, overload, overheat, or extreme weather hazard occurs.
      * **Extreme Weather Alert Banner** (rendered when `Heavy Rain` or `Thunderstorm` is active).
      * **Left Panel:** Dynamic Day/Night Compact 4-Socket Hardware Strip with live thermal readout (`°C`) and tap-to-toggle sockets.
      * **Center Panel:** Fixed-height Smartphone Companion App Frame with 4-Tab Bottom Navigation Bar (`Dashboard`, `Socket`, `Schedule`, `WhatsApp`) and top push notification banner.

@@ -27,6 +27,7 @@ import {
   WhatsAppEventType,
   WhatsAppMessage,
 } from '../types/simulator';
+import { startAlarmLoop, stopAlarmLoop } from './alarmAudio';
 import {
   calculateMultiSocketMonthlyProjection,
   isOffPeakMinute,
@@ -153,6 +154,9 @@ export function useSimulatorEngine() {
   >({});
   const [referenceDate] = useState<Date>(() => new Date());
   const [isSafetyLocked, setIsSafetyLocked] = useState<boolean>(false);
+  const [isAlarmActive, setIsAlarmActive] = useState<boolean>(false);
+  const [isAlarmMuted, setIsAlarmMuted] = useState<boolean>(false);
+  const [alarmReason, setAlarmReason] = useState<string | null>(null);
   const [clockSeconds, setClockSeconds] = useState<number>(INITIAL_CLOCK_SECONDS);
   const [speedMultiplier, setSpeedMultiplier] = useState<SpeedMultiplier>(60);
   const [faultInjection, setFaultInjection] = useState<FaultInjection>('NONE');
@@ -313,6 +317,9 @@ export function useSimulatorEngine() {
         OVERHEAT: 'Thermal Overheat (>=70°C)',
       };
 
+      setIsAlarmActive(true);
+      setAlarmReason(`${eventTitleMap[type]} • ${measuredValue}`);
+
       const detailMap: Record<AnomalyType, string> = {
         UNDERVOLTAGE: `${measuredValue} sag violated SPLN 1:1995 (<198V). All active sockets cut off (${targetLabel}).`,
         OVERVOLTAGE: `${measuredValue} surge violated SPLN 1:1995 (>242V). All active sockets cut off (${targetLabel}).`,
@@ -374,6 +381,9 @@ export function useSimulatorEngine() {
 
       if (fault === 'NONE') {
         setFaultInjection('NONE');
+        setIsSafetyLocked(false);
+        setIsAlarmActive(false);
+        setAlarmReason(null);
         setPlugTemperatureC((prev) => (prev >= 70 ? 36.0 : prev));
         setVoltageHistory((prev) => [
           ...prev.slice(-(MAX_VOLTAGE_POINTS - 1)),
@@ -466,6 +476,9 @@ export function useSimulatorEngine() {
       const detail = isStorm
         ? `Severe thunderstorm detected in ${nextWeather.city}. Lightning surge protection is active on standby.`
         : `Heavy rainfall detected in ${nextWeather.city}. Grid surge monitoring heightened.`;
+
+      setIsAlarmActive(true);
+      setAlarmReason(title);
 
       pushNotification('WhatsApp: EcoShift Guard', detail, 'warning', clock.formattedFull, 'WHATSAPP');
       pushWhatsAppAlert({
@@ -775,7 +788,49 @@ export function useSimulatorEngine() {
     [chartPeriodMode]
   );
 
+  const toggleAlarmMute = useCallback(() => {
+    setIsAlarmMuted((prev) => !prev);
+  }, []);
+
+  const stopAndResetAlarm = useCallback(() => {
+    const s = stateRef.current;
+    const clock = decodeClock(s.clockSeconds);
+
+    stopAlarmLoop();
+    setIsAlarmActive(false);
+    setAlarmReason(null);
+    setFaultInjection('NONE');
+    setIsSafetyLocked(false);
+    setPlugTemperatureC((prev) => (prev >= 70 ? 38.0 : prev));
+    setVoltageHistory((prev) => [
+      ...prev.slice(-(MAX_VOLTAGE_POINTS - 1)),
+      { tick: s.tickCount + 1, voltage: s.country.nominalVoltage, isAnomaly: false },
+    ]);
+
+    pushNotification(
+      'Alarm Reset',
+      `Alarm silenced and safety lock cleared. Nominal ${s.country.nominalVoltage}V restored.`,
+      'info',
+      clock.formattedFull
+    );
+  }, [pushNotification]);
+
+  useEffect(() => {
+    if (isAlarmActive && !isAlarmMuted) {
+      startAlarmLoop();
+    } else {
+      stopAlarmLoop();
+    }
+    return () => {
+      stopAlarmLoop();
+    };
+  }, [isAlarmActive, isAlarmMuted]);
+
   const resetDemo = useCallback(() => {
+    stopAlarmLoop();
+    setIsAlarmActive(false);
+    setAlarmReason(null);
+    setIsAlarmMuted(false);
     setCountryCode('ID');
     setSockets(createInitialSockets());
     setDailyHistory(INITIAL_DAILY_HISTORY);
@@ -1118,6 +1173,9 @@ export function useSimulatorEngine() {
     periodAnalytics,
     activeSockets,
     isSafetyLocked,
+    isAlarmActive,
+    isAlarmMuted,
+    alarmReason,
     relayState,
     clock,
     isCurrentlyOffPeak,
@@ -1144,6 +1202,8 @@ export function useSimulatorEngine() {
 
     // Actions
     selectCountry,
+    toggleAlarmMute,
+    stopAndResetAlarm,
     setChartPeriodMode,
     stepPeriodOffset,
     toggleSocket,

@@ -22,14 +22,14 @@ export function Navbar({
 }: NavbarProps) {
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-white/85 backdrop-blur-md border-b border-black/[0.06]">
-      <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Left: Brand Identity with Geometric Leaf-Bolt SVG */}
+      <div className="w-full max-w-[1440px] mx-auto px-8 sm:px-12 lg:px-20 xl:px-24 h-16 flex items-center justify-between gap-4">
+        {/* Left: Amartaloka Brand Identity */}
         <button
           type="button"
           onClick={() => onNavigate('home')}
-          className="flex items-center gap-2.5 group cursor-pointer"
+          className="flex items-center gap-2.5 group cursor-pointer shrink-0"
         >
-          <div className="w-8 h-8 rounded-xl bg-[#1D1D1F] flex items-center justify-center shadow-xs group-hover:bg-[#047857] transition-colors">
+          <div className="w-8 h-8 rounded-xl bg-[#0F172A] flex items-center justify-center shadow-xs group-hover:bg-[#047857] transition-colors">
             <svg
               viewBox="0 0 24 24"
               className="w-4.5 h-4.5"
@@ -38,7 +38,7 @@ export function Navbar({
             >
               <path
                 d="M19 4C11.5 4 6 8.5 6 16C6 17.5 6.3 18.8 6.8 20C14 19.5 19.5 14.5 19 4Z"
-                stroke="#34D399"
+                stroke="#22C55E"
                 strokeWidth="1.8"
                 strokeLinejoin="round"
               />
@@ -51,9 +51,14 @@ export function Navbar({
               />
             </svg>
           </div>
-          <span className="font-semibold text-[15px] tracking-tight text-[#1D1D1F]">
-            EcoShift
-          </span>
+          <div className="text-left leading-tight">
+            <span className="font-bold italic text-[15px] tracking-tight text-[#0F172A] block">
+              Amartaloka
+            </span>
+            <span className="text-[10px] font-semibold text-[#6E6E73] block">
+              EcoShift Smart Plug
+            </span>
+          </div>
         </button>
 
         {/* Center: Smooth-scroll Navigation Links */}
@@ -78,7 +83,7 @@ export function Navbar({
         </nav>
 
         {/* Right: Active Country Tariff Pill + CTA */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => onNavigate('simulator')}

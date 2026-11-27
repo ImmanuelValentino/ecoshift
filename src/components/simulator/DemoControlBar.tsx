@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  BellOff,
   Clock,
   CloudLightning,
   CloudRain,
@@ -12,6 +13,8 @@ import {
   RotateCcw,
   ShieldCheck,
   Sun,
+  Volume2,
+  VolumeX,
   Zap,
   ZapOff,
 } from 'lucide-react';
@@ -51,10 +54,14 @@ export function DemoControlBar({ engine }: DemoControlBarProps) {
     speedMultiplier,
     faultInjection,
     weather,
+    isAlarmActive,
+    isAlarmMuted,
     setSpeedMultiplier,
     jumpToTime,
     triggerFault,
     setWeatherMode,
+    toggleAlarmMute,
+    stopAndResetAlarm,
     resetDemo,
   } = engine;
 
@@ -264,15 +271,50 @@ export function DemoControlBar({ engine }: DemoControlBarProps) {
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={resetDemo}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white text-[#6E6E73] hover:text-[#1D1D1F] border border-black/[0.1] hover:bg-[#F5F5F7] transition-colors cursor-pointer"
-          title="Reset simulator to default state"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          Reset Demo
-        </button>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleAlarmMute}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+              isAlarmMuted
+                ? 'bg-[#F5F5F7] text-[#6E6E73] border-black/[0.08] hover:text-[#1D1D1F]'
+                : 'bg-emerald-50 text-[#047857] border-emerald-200 hover:bg-emerald-100'
+            }`}
+            title="Toggle Web Audio alarm sound"
+          >
+            {isAlarmMuted ? (
+              <VolumeX className="w-3.5 h-3.5" />
+            ) : (
+              <Volume2 className="w-3.5 h-3.5" />
+            )}
+            {isAlarmMuted ? 'Alarm Audio: Muted' : 'Alarm Audio: ON'}
+          </button>
+
+          <button
+            type="button"
+            disabled={!isAlarmActive}
+            onClick={stopAndResetAlarm}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+              isAlarmActive
+                ? 'bg-[#DC2626] text-white border-[#DC2626] hover:bg-red-700 shadow-xs'
+                : 'bg-[#F5F5F7] text-[#86868B] border-black/[0.06] opacity-60 cursor-not-allowed'
+            }`}
+            title="Silence alarm and reset safety fault state"
+          >
+            <BellOff className="w-3.5 h-3.5" />
+            Stop &amp; Reset Alarm
+          </button>
+
+          <button
+            type="button"
+            onClick={resetDemo}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white text-[#6E6E73] hover:text-[#1D1D1F] border border-black/[0.1] hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+            title="Reset simulator to default state"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset Demo
+          </button>
+        </div>
       </div>
     </div>
   );

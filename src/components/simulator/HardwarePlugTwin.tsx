@@ -38,6 +38,7 @@ export function HardwarePlugTwin({ engine }: HardwarePlugTwinProps) {
     totalPowerWatts,
     totalDailyKwh,
     faultInjection,
+    isAlarmActive,
     plugTemperatureC,
     thermalStatus,
     toggleSocket,
@@ -63,7 +64,11 @@ export function HardwarePlugTwin({ engine }: HardwarePlugTwinProps) {
       : 'NORMAL';
 
   return (
-    <div className="bg-white rounded-3xl border border-black/[0.08] p-4 flex flex-col justify-between gap-3 shadow-xs">
+    <div
+      className={`bg-white rounded-3xl border border-black/[0.08] p-4 flex flex-col justify-between gap-3 shadow-xs transition-colors ${
+        isAlarmActive ? 'alarm-active-card' : ''
+      }`}
+    >
       {/* Compact Header */}
       <div className="flex items-center justify-between gap-2">
         <div>
@@ -170,7 +175,7 @@ export function HardwarePlugTwin({ engine }: HardwarePlugTwinProps) {
           {sockets.map((sock) => {
             const Icon = getApplianceIcon(sock.appliance.id);
             const active = sock.isOn;
-            const ledColor = isTripped ? '#DC2626' : active ? '#10B981' : '#94A3B8';
+            const ledColor = isAlarmActive || isTripped ? '#EF4444' : active ? '#10B981' : '#94A3B8';
 
             return (
               <button
@@ -199,7 +204,7 @@ export function HardwarePlugTwin({ engine }: HardwarePlugTwinProps) {
                     {/* LED Ring */}
                     <span
                       className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        isTripped ? 'animate-pulse' : ''
+                        isAlarmActive || isTripped ? 'animate-pulse bg-red-500/20' : ''
                       }`}
                       style={{ borderColor: ledColor }}
                     >

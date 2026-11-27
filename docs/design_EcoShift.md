@@ -52,30 +52,32 @@ When plug temperature enters `Warm (56°C to 69°C)` or `Overheat (>= 70°C)`, t
 
 ### 4.1 Vertical Page Flow (3-Section Full-Page Scroll Snap)
 1. **Fixed Minimalist Header (`fixed top-0 bg-white/85 backdrop-blur-md border-b border-black/5`):**
-   * Left: `EcoShift` wordmark with clean geometric leaf-bolt SVG mark.
+   * Left: `Amartaloka` (`EcoShift Smart Plug`) wordmark with clean geometric leaf-bolt SVG mark.
    * Center: Smooth-scroll links (`Home`, `Product`, `Live Simulator`) with active section highlight.
    * Right: Active Country Regulation pill and solid pill CTA button (`Try Live Simulator`).
+   * Container uses generous Apple-style horizontal margins (`w-full max-w-[1440px] mx-auto px-8 sm:px-12 lg:px-20 xl:px-24`).
    * Right-edge minimalist dot navigation (`Home`, `Product`, `Live Simulator`) on `xl` screens.
 2. **Section 1: Home / Hero (100vh Split Screen on `#FFFFFF`):**
-   * Left column: `EcoShift` headline, `Power, Perfected. Protection, Instant.` tagline, concise description, and single `Try Live Simulator` button.
-   * Right column: Interactive 360-degree **Three.js 3D Smart Socket** (`EcoShift3DSocket.tsx`) with matte white body, Type-F socket cavity, brass contacts, grounding clips, glowing emerald LED ring, side power button, rear prongs, soft studio shadow, and `Drag to rotate 360°` hint.
+   * Left column: `One Plug, Triple Protection • Smart Home Plug` badge, `Amartaloka` headline, `One Plug, Triple Protection.` tagline, sub-tagline, and single `Try Live Simulator` button.
+   * Right column: Interactive 360-degree **Three.js 3D Amartaloka Smart Plug** (`EcoShift3DSocket.tsx`) with vertical rounded squircle housing (`1 : 1.38`), `Amartaloka` canvas logo texture (house + plug + leaf), glowing green pill LED + `PointLight`, recessed Type-F cavity with brass rings, grounding clips, and vertical guide notches, rear 2 chrome prongs, soft studio shadow, and `Drag to rotate 360°` hint.
 3. **Section 2: Product & Usage Overview (100vh on `#FFFFFF` with `#F5F5F7` Cards):**
    * Headline: `Built for Everyday Appliances. Engineered for Safety.`
-   * Part A: 3 compact feature cards (`Smart Daily Scheduling`, `Instant Anomaly Cutoff`, `Real-Time Energy & WhatsApp Alerts`).
-   * Part B: 3 horizontal usage steps (`01. Plug In`, `02. Set Schedule & Limits`, `03. Monitor & Control`).
+   * Part A: Triple Protection cards (**EcoShift** `Smart Scheduling`, **TripTrace** `Event Diary`, **HeatDot** `Heat Warning`).
+   * Part B: 3 horizontal usage steps (`01. Plug In`, `02. Schedule & Protect`, `03. Monitor & Alert`).
 4. **Section 3: Interactive Web Simulator Workbench (Full-Width Bento Container `#F5F5F7` + Footer):**
    * **Top Control Strip (`#FFFFFF` rounded bar):**
      * Virtual Clock + Speed Selector (`Pause`, `1x`, `60x`, `300x`, `1800x`) + Quick Time Jump buttons (`07:30`, `13:00`, `19:30`, `23:05`).
      * Fault and Thermal Test Triggers (`Undervoltage 176V`, `Overvoltage 265V`, `Overload 2,480W`, `Simulate Overheat (>70°C)`, `Restore Normal`).
-     * Weather Protection Controls (`Live API`, `Clear (Normal)`, `Heavy Rain`, `Thunderstorm`) with active city weather pill.
+     * Weather Protection Controls (`Live API`, `Clear (Normal)`, `Heavy Rain`, `Thunderstorm`) with active city weather pill, plus `Alarm Audio: ON / Muted` toggle and `Stop & Reset Alarm` button.
+   * **Emergency Alarm & Red Shake Alert:** When `isAlarmActive === true`, `.alarm-active-card` applies a horizontal shake animation (`alarm-shake`), thick red border, and pulsing red glow (`rgba(239, 68, 68, 0.4)`) simultaneously to the top Emergency Alarm banner, `HardwarePlugTwin` (with flashing red socket LEDs), and `SmartphoneAppFrame` (with red emergency top bar).
    * **Extreme Weather Warning Banner:** Appears cleanly above the 3-column workspace whenever `Heavy Rain` or `Thunderstorm` is active, showing lightning/surge protection standby status.
    * **Three-Column Interactive Workspace (`w-full max-w-[1720px]` container, `grid-cols-1 lg:grid-cols-[1.15fr_390px_1.15fr] xl:grid-cols-[1.2fr_410px_1.2fr] gap-5`):**
      * **Left Column (`1.15fr` / `1.2fr`): Compact 4-Socket Hardware Stage (No-Scroll on Laptop)** (Day/Night room, 4-socket smart power strip with reduced thermal glow & live `°C` pill, animated cables, 4 fixed appliances `S1–S4`, and tap-to-toggle relay).
      * **Center Column (`390px` / `410px`): Companion Smartphone App with 4-Tab Bottom Navigation Bar** (Top WhatsApp/Alert push banner, wheel-isolated scrollable screen body, permanent Bottom Navigation Bar with `Dashboard`, `Socket` + active badge, `Schedule`, and `WhatsApp` + unread badge).
      * **Right Column (`1.15fr` / `1.2fr`): Country Tariff, Aggregate Telemetry and Impact** (Country selector, live voltage sparkline with `198V–231V` safe band and `232V–242V` warning band, Voltage/Total Amp/Total Load/Plug Temp tiles, 4-socket daily kWh breakdown, synchronized Weekly/Monthly bill bar, off-peak savings, carbon reduction, and anomaly log).
 5. **Layout Alignment & Scroll-Snap Behavior:**
-   * Navbar, Footer, and Simulator Workbench share `w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8` for crisp edge-to-edge alignment across `1280px`, `1440px`, and `1920px` viewports.
-   * Home and Product sections use `w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8` inside an `h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth` scroll container.
+   * Navbar, Footer, Home, and Product sections share `w-full max-w-[1440px] mx-auto px-8 sm:px-12 lg:px-20 xl:px-24` for crisp Apple-grade horizontal breathing room across desktop viewports.
+   * Simulator Workbench uses `w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8` inside an `h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth` scroll container.
    * Internal `wheel` listener on the smartphone screen prevents scroll chaining so scrolling inside the phone never triggers page section snap.
 
 ## 5. Companion Smartphone Frame and WhatsApp Mockup (Center Column)

@@ -50,6 +50,7 @@
 * **SocketId & SocketState (`src/types/simulator.ts`):** Models 4 independent sockets (`1 | 2 | 3 | 4`), each permanently paired with its fixed appliance (`Water Heater 1,500W`, `AC 900W`, `Dispenser 350W`, `Laptop Charger 65W`), tracking `isOn`, `activeDurationSeconds`, `activeSessionKwh`, `dailyKwh`, `autoCutoffMinutes`, and `remainingCutoffSeconds`. Turning a socket OFF resets its active session duration and kWh to `0`; `dailyKwh` resets on simulated day rollover (`00:00`).
 * **Per-Socket Overload & Thermal Physics:** Each socket (`1 | 2 | 3 | 4`) is rated up to `2,400 W` (`10A / 250V`) independently. Turning on all 4 standard appliances simultaneously (`2,815 W` aggregate) runs normally without overload; overload (`> 2,400 W`) is evaluated per individual socket and cuts off only the overloaded socket. Under normal operation, combined thermal accumulation stabilizes safely in the `35°C to 58°C` range and only trips `>= 70°C` when `OVERHEAT` is triggered.
 * **ScheduleSlot:** Binds each daily schedule to a specific `socketId: 1 | 2 | 3 | 4`.
+* **Audiovisual Alarm Engine (`src/engine/alarmAudio.ts` & `useSimulatorEngine.ts`):** Synthesizes a dual-tone `880 Hz` / `660 Hz` electronic alarm every `300ms` via the Web Audio API (`AudioContext`) whenever `isAlarmActive` is triggered (`UNDERVOLTAGE`, `OVERVOLTAGE`, `OVERLOAD`, `OVERHEAT`, or `EXTREME_WEATHER`) and `!isAlarmMuted`. Paired with `stopAndResetAlarm()` and `.alarm-active-card` CSS shake + pulsing red glow.
 * **Period Analytics & 1-Year History (`src/engine/periodAnalytics.ts`):** Manages shared `chartPeriodMode` (`'weekly' | 'monthly'`) and `periodOffset` (`0` down to `-51` for 52 weeks, or `0` down to `-11` for 12 months) anchored to the user's local `new Date()`. Past periods use deterministic seeded kWh values per socket (`S1`–`S4`); when `periodOffset === 0`, the current day (`Weekly`) and `Week 4` (`Monthly`) blend live `sockets[0..3].dailyKwh` in real time. Both `SmartphoneAppFrame` and `BillingAnalyticsPanel` compute actual period totals (`totalBill`, `totalKwh`, `totalOffPeakSavings`, `totalCo2AvoidedKg`) directly from the active period's bars.
 * **CountryTariffConfig:** Adds city coordinates (`city`, `latitude`, `longitude`) for weather lookup alongside `nominalVoltage`, `peakRate`, `offPeakRate`, `offPeakStartMinutes`, `offPeakEndMinutes`, `peakCarbonGPerKwh`, and `offPeakCarbonGPerKwh`.
 * **FaultInjection:** `'NONE' | 'UNDERVOLTAGE' | 'OVERVOLTAGE' | 'OVERLOAD' | 'OVERHEAT'`.
@@ -107,7 +108,8 @@ ecoshift/
     ├── services/
     │   └── weatherService.ts            # Google Weather API client + local fallback
     ├── engine/
-    │   ├── useSimulatorEngine.ts        # Master hook: clock, thermal, safety, weather, WhatsApp
+    │   ├── alarmAudio.ts                # Web Audio API dual-tone emergency alarm synthesizer
+    │   ├── useSimulatorEngine.ts        # Master hook: clock, thermal, safety, weather, alarm, WhatsApp
     │   ├── billingCalculator.ts         # Pure functions for monthly bill, savings & CO2
     │   └── billingCalculator.test.ts    # Vitest unit tests
     └── components/
