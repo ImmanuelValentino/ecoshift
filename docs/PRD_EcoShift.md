@@ -1,174 +1,129 @@
 # Product Requirements Document (PRD)
-## EcoShift Home — Interactive Smart Plug Pitch & Simulator
+## EcoShift Home: Interactive Smart Plug Pitch and Simulator
 
 | Metadata | Detail |
 | :--- | :--- |
 | **Product Name** | EcoShift Home (Single-Socket Smart Plug Simulator) |
-| **Document Version** | 1.0 |
+| **Document Version** | 2.0 |
 | **Target Audience** | International Sustainability Business Model Canvas (BMC) Competition Judges |
 | **Website Format** | Pitch Landing Page + Embedded Interactive Web Simulator |
-| **System Architecture** | 100% Client-Side Interactive Web Simulator (No physical hardware/ESP32 connection) |
+| **System Architecture** | Client-Side Interactive Web Simulator with Optional Google Weather API Integration |
 | **Primary Language** | English (International Competition Standard) |
 
----
+## 1. Executive Summary and Product Vision
 
-## 1. Executive Summary & Product Vision
+**EcoShift Home** is a plug-and-play single-socket smart plug solution designed to help urban households shift high-power appliance usage to off-peak hours, automate daily power schedules, protect electronics from electrical grid anomalies and thermal overheating, monitor extreme weather surge risks, and reduce household carbon footprints.
 
-**EcoShift Home** is a plug-and-play single-socket smart plug solution designed to help urban households shift high-power appliance usage to off-peak hours, automate daily power schedules, protect electronics from electrical grid anomalies, and reduce household carbon footprints.
+This web application serves as a **live interactive pitch platform** for an **International Sustainability Business Model Canvas (BMC)** competition. Rather than relying on static slides, the website combines a compelling sustainability pitch narrative with a real-time, self-contained **Interactive Web Simulator**—allowing judges to manipulate virtual time, observe day/night environmental transitions, schedule appliances, inject electrical grid or thermal anomalies, test extreme weather alerts, and inspect country-specific monthly electricity bills and off-peak savings.
 
-This web application serves as a **live interactive pitch platform** for an **International Sustainability Business Model Canvas (BMC)** competition. Rather than relying on static slides, the website combines a compelling sustainability pitch narrative with a real-time, self-contained **Interactive Web Simulator**—allowing judges to manipulate virtual time, observe day/night environmental transitions, schedule appliances, inject electrical grid anomalies, and inspect country-specific monthly electricity bills and off-peak savings.
-
----
-
-## 2. Product Scope & Strict Guardrails
+## 2. Product Scope and Strict Guardrails
 
 ### 2.1 In-Scope (Must Build)
-- **Pitch Landing Page:** Narrative sections tailored for international sustainability judges (Hero, Problem/Grid Challenge, 3-Step Solution, Live Interactive Simulator, and Sustainability BMC Overview).
-- **Single-Socket Hardware Twin (1 Outlet):** Visual and logical simulation of **1 smart plug socket** connected to one selectable household appliance at a time.
-- **4 Preset Household Appliances:**
+* **Pitch Landing Page:** Narrative sections tailored for international sustainability judges (Hero, Problem/Grid Challenge, 3-Step Solution, Live Interactive Simulator, and Sustainability BMC Overview).
+* **Single-Socket Hardware Twin (1 Outlet):** Visual and logical simulation of **1 smart plug socket** connected to one selectable household appliance at a time.
+* **4 Preset Household Appliances:**
   1. **Water Heater** (`1,500 W`)
   2. **AC (Air Conditioner)** (`900 W`)
   3. **Dispenser (Water Dispenser)** (`350 W`)
   4. **Charger (Laptop/Phone Fast Charger)** (`65 W`)
-- **4 Core Smart Plug Features:**
-  1. **Auto-On & Auto-Cutoff:** Rule-based relay control (Auto-On via Daily Schedule or Off-Peak Hour entry; Auto-Cutoff via Countdown Timer, Overload, or Voltage Anomaly).
-  2. **Daily On/Off Scheduling:** Multi-slot schedule configuration across days of the week (`Monday–Sunday`).
-  3. **Anomaly Voltage & Overload Detection:** Real-time monitoring with instant power relay cutoff and instant simulated smartphone push notification.
-  4. **Country-Based Monthly Bill & Off-Peak Savings Estimator:** Regulatory-accurate billing simulation comparing **Flat Tariff** countries (Indonesia) vs. **Time-of-Use (TOU)** countries (United Kingdom, Malaysia, Singapore, Germany).
-- **Demo Presentation Controls:** Custom time-speed multiplier, Day/Night visual environment synced with simulated time, and instant Voltage Anomaly injection triggers.
+* **Core Smart Plug Features:**
+  1. **Auto-On and Auto-Cutoff:** Rule-based relay control (Auto-On via Daily Schedule or Off-Peak Hour entry; Auto-Cutoff via Countdown Timer, Overload, Voltage Anomaly, or Thermal Overheat).
+  2. **Daily On/Off Scheduling:** Multi-slot schedule configuration across days of the week (`Monday to Sunday`).
+  3. **Electrical Safety (SPLN 1:1995 / Permen ESDM) and Thermal Monitoring (SNI IEC 60884-1):** Real-time voltage, load, and terminal temperature monitoring with instant relay cutoff, anomaly logging, and WhatsApp alert delivery.
+  4. **Extreme Weather Protection Integration:** Google Maps Platform Weather API (`currentConditions:lookup`) with local simulation fallback to warn users of `Heavy Rain` or `Thunderstorm` lightning/surge hazards.
+  5. **WhatsApp Virtual Mockup (EcoShift Guard):** In-phone WhatsApp alert banner and dedicated **WhatsApp** chat tab inside the Smartphone Frame.
+  6. **Country-Based Monthly Bill and Off-Peak Savings Estimator:** Regulatory-accurate billing simulation comparing **Flat Tariff** countries (Indonesia) vs. **Time-of-Use (TOU)** countries (United Kingdom, Malaysia, Singapore, Germany).
+* **Demo Presentation Controls:** Custom time-speed multiplier, Day/Night visual environment synced with simulated time, Weather condition controls (`Live API`, `Clear`, `Heavy Rain`, `Thunderstorm`), and instant Fault/Overheat triggers.
 
 ### 2.2 Out-of-Scope (Strictly Excluded)
-- **No Hardware Connection:** Zero WebSocket, MQTT, Bluetooth, or Serial connections to real ESP32 devices.
-- **No Multi-Socket Strip:** Do not build a 4-outlet power strip; strictly **1 socket**.
-- **No Water-Saving Hardware:** Exclude *Eco-Shower Head* and *Smart Water Meter* from this product scope.
-- **No Pricing / BOM / ROI Tables:** Omit hardware unit pricing, cost of goods sold, and financial payback pricing.
-- **No "Auto-Save Mode" Toggle:** Do not include a generic "Auto Eco/Save Mode" switch.
-- **No AI Autonomous Load Shifting:** Scheduling must be explicit and deterministic (user-configured daily schedules and off-peak auto-on triggers).
-- **No Gamification / Eco-Reward Points:** Completely exclude Eco-Points, point balances, badges, or voucher redemption tabs.
-
----
+* **No Hardware Connection:** Zero WebSocket, MQTT, Bluetooth, or Serial connections to real ESP32 devices.
+* **No Multi-Socket Strip:** Do not build a 4-outlet power strip; strictly **1 socket**.
+* **No Water-Saving Hardware:** Exclude *Eco-Shower Head* and *Smart Water Meter* from this product scope.
+* **No Pricing / BOM / ROI Tables:** Omit hardware unit pricing, cost of goods sold, and financial payback pricing.
+* **No "Auto-Save Mode" Toggle:** Do not include a generic "Auto Eco/Save Mode" switch.
+* **No AI Autonomous Load Shifting:** Scheduling must be explicit and deterministic (user-configured daily schedules and off-peak auto-on triggers).
+* **No Gamification / Eco-Reward Points:** Completely exclude Eco-Points, point balances, badges, or voucher redemption tabs.
 
 ## 3. Pitch Landing Page Structure
 
-The landing page must flow seamlessly from executive storytelling into hands-on demonstration:
+The landing page flows seamlessly from executive storytelling into hands-on demonstration:
 
 1. **Top Navigation Bar:**
-   - Brand identity (`EcoShift Home`), anchor links (`The Challenge`, `How It Works`, `Live Simulator`, `Sustainability BMC`), active Country Tariff indicator, and a primary CTA button (`Launch Live Demo`).
+   * Brand identity (`EcoShift Home`), anchor links (`Overview`, `How It Works`, `Live Simulator`, `Sustainability BMC`), active Country Tariff indicator, and a primary CTA button (`Launch Live Demo`).
 2. **Hero Section (Pitch Opening):**
-   - Headline: *"Shift Peak Loads. Protect Appliances. Decarbonize Every Home."*
-   - Subheadline explaining how a single smart plug bridges household energy automation with national grid decarbonization.
-   - Alignment badges for **UN Sustainable Development Goals (SDGs)**: `SDG 7 (Affordable & Clean Energy)`, `SDG 12 (Responsible Consumption)`, and `SDG 13 (Climate Action)`.
-3. **Problem & Sustainability Opportunity:**
-   - Visual breakdown of peak-hour grid congestion (fossil-fuel peaker plant reliance), unstable residential voltage damaging appliances, and phantom/forgotten appliance runtime.
+   * Headline: *"Shift Peak Loads. Protect Appliances. Decarbonize Every Home."*
+   * Subheadline explaining how a single smart plug bridges household energy automation with national grid decarbonization.
+   * Alignment badges for **UN Sustainable Development Goals (SDGs)**: `SDG 7 (Affordable & Clean Energy)`, `SDG 12 (Responsible Consumption)`, and `SDG 13 (Climate Action)`.
+3. **Problem and Sustainability Opportunity:**
+   * Visual breakdown of peak-hour grid congestion (fossil-fuel peaker plant reliance), unstable residential voltage and thermal overload damaging appliances, and forgotten appliance runtime.
 4. **Interactive Web Simulator (Core Centerpiece):**
-   - Full-width interactive command center containing:
-     - **Demo Scenario Control Bar** (Time Speed, Time Jump, Anomaly Triggers, Reset).
-     - **Left Panel:** Dynamic Day/Night Room Scene + 1-Socket Smart Plug Hardware Twin + Appliance Selector.
-     - **Center Panel:** Interactive Smartphone Companion App Frame (Controls, Timer, Daily Scheduler, and Live Push Notification Overlay).
-     - **Right Panel:** Country Tariff Selector, Real-Time Electrical Telemetry, Monthly Bill Forecast (Peak vs. Off-Peak), Off-Peak Savings, Carbon Reduction, and Anomaly Log.
+   * Full-width interactive command center containing:
+     * **Demo Scenario Control Bar** (Time Speed, Time Jump, Grid Fault and Overheat Triggers, Weather Mode Controls, Reset).
+     * **Extreme Weather Alert Banner** (rendered when `Heavy Rain` or `Thunderstorm` is active).
+     * **Left Panel:** Dynamic Day/Night Room Scene + 1-Socket Smart Plug Hardware Twin with live thermal readout (`°C`) + Appliance Selector.
+     * **Center Panel:** Interactive Smartphone Companion App Frame with **Controls** tab, **WhatsApp (EcoShift Guard)** tab, and top WhatsApp/Alert notification banner overlay.
+     * **Right Panel:** Country Tariff Selector, Real-Time Electrical and Thermal Telemetry, Monthly Bill Forecast (Peak vs. Off-Peak), Off-Peak Savings, Carbon Reduction, and Anomaly Log.
 5. **Sustainability Business Model Canvas (BMC) Highlights:**
-   - Clean, judge-ready summary cards presenting the **Value Proposition**, **Customer Segments**, **Key Activities & Resources**, **Impact Metrics** ($\text{kWh}$ shifted, Peak $\text{kW}$ shaved, $\text{kg CO}_2$ avoided), and **Environmental Sustainability Advantage** (without unit pricing clutter).
-
----
+   * Clean, judge-ready summary cards presenting the **Value Proposition**, **Customer Segments**, **Key Activities & Resources**, **Key Partners**, **Channels**, and **Environmental and Social Impact Metrics** (without unit pricing clutter).
 
 ## 4. Detailed Functional Requirements
 
-### FR-1: Simulation Time Engine & Dynamic Day/Night Environment
-- **Virtual Clock:** Displays simulated `Day of Week` (`Mon–Sun`) and `24-Hour Time` (`HH:MM:SS`).
-- **Custom Time Speed Controls:** Judges can select simulation speed multipliers:
-  - `Pause (0x)`
-  - `Real-Time (1x)`
-  - `Fast (60x — 1 min/sec)`
-  - `Turbo (300x — 5 mins/sec)`
-  - `Ultra (1800x — 30 mins/sec)`
-- **Quick Time Jump Presets:** One-click buttons to jump simulated time to key moments:
-  - `07:30` (Morning Peak Start)
-  - `13:00` (Midday)
-  - `19:30` (Evening Peak Hour)
-  - `23:05` (Night Off-Peak Entry)
-- **Day/Night Environment Sync:**
-  - **Daytime (`06:00 – 17:59`):** Simulator environment renders bright daylight ambiance, sunlit room backdrop, and a `DAYTIME` indicator.
-  - **Nighttime (`18:00 – 05:59`):** Simulator environment smoothly transitions to night ambiance, dark indigo sky with stars, warm interior room glow when the plug is active, and a `NIGHTTIME` indicator.
+### FR-1: Simulation Time Engine and Dynamic Day/Night Environment
+* **Virtual Clock:** Displays simulated `Day of Week` (`Mon to Sun`) and `24-Hour Time` (`HH:MM:SS`).
+* **Custom Time Speed Controls:** Judges can select simulation speed multipliers: `Pause (0x)`, `Real-Time (1x)`, `Fast (60x)`, `Turbo (300x)`, and `Ultra (1800x)`.
+* **Quick Time Jump Presets:** One-click buttons to jump simulated time to `07:30 Morning`, `13:00 Midday`, `19:30 Peak`, and `23:05 Off-Peak`.
+* **Day/Night Environment Sync:** Daytime (`06:00 to 17:59`) renders bright daylight ambiance; Nighttime (`18:00 to 05:59`) transitions smoothly to dark indigo sky with stars and warm interior glow when active.
 
-### FR-2: Single-Socket Smart Plug & Appliance Simulator
-- **1-Socket Hardware State:**
-  - Relay Status: `ON (CLOSED)`, `OFF (OPEN)`, or `TRIPPED (SAFETY LOCKOUT)`.
-  - Visual LED Ring on the smart plug changes color dynamically (Emerald Green = `ON`, Neutral Slate = `OFF`, Flashing Crimson = `TRIPPED`).
-- **Appliance Selector (1 Connected Device at a Time):**
-  - Users can plug in one of the 4 preset appliances:
-    - **Water Heater:** `1,500 W` (High thermal load — ideal for off-peak shifting)
-    - **AC (Air Conditioner):** `900 W` (Sustained cooling load)
-    - **Dispenser:** `350 W` (Heating element load)
-    - **Charger:** `65 W` (Electronics charging load — ideal for countdown timer auto-cutoff)
-- **Live Electrical Telemetry:**
-  - Displays real-time **Voltage ($V$)**, **Current ($A$)**, **Active Power ($W$)**, and **Session Energy ($\text{kWh}$)**.
+### FR-2: Single-Socket Smart Plug and Appliance Simulator
+* **1-Socket Hardware State:** Relay Status `ON (CLOSED)`, `OFF (OPEN)`, or `TRIPPED (SAFETY LOCKOUT)`.
+* **Appliance Selector (1 Connected Device at a Time):** `Water Heater (1,500 W)`, `AC (900 W)`, `Dispenser (350 W)`, `Charger (65 W)`.
+* **Live Electrical and Thermal Telemetry:** Displays real-time **Voltage (`V`)**, **Current (`A`)**, **Active Power (`W`)**, **Plug Temperature (`°C`)**, and **Session Energy (`kWh`)**.
 
-### FR-3: Auto-On & Auto-Cutoff Automation Logic
+### FR-3: Auto-On and Auto-Cutoff Automation Logic
 The smart plug relay is governed by deterministic automation rules in strict priority order:
 1. **Safety Auto-Cutoff (Highest Priority):**
-   - Triggered immediately if **Voltage Anomaly** (`< 195 V` or `> 245 V`) OR **Overload** (`Active Power > 2,200 W` / `Current > 10 A`) occurs.
-   - Action: Relay opens (`OFF / TRIPPED`) instantaneously, stopping power flow.
-2. **Timer Auto-Cutoff:**
-   - User can set a **Countdown Timer** (e.g., `15m`, `30m`, `1h`, `2h`, or custom minutes) in the smartphone app.
-   - Action: When countdown reaches `00:00`, the plug automatically cuts off power (`OFF`).
-3. **Off-Peak Auto-On:**
-   - User can toggle **"Auto-On at Off-Peak Hour"** (`ON/OFF`) in the smartphone app.
-   - Action: The exact moment the simulated clock enters the selected country's Off-Peak window (and relay is not in safety lockout), the smart plug automatically turns `ON`.
-4. **Daily Schedule Auto-On / Auto-Off:**
-   - Action: When simulated clock matches an enabled schedule's `Start Time`, the plug turns `ON`; when it matches `End Time`, the plug turns `OFF`.
+   * Triggered immediately if **Undervoltage (`< 198 V`)**, **Overvoltage (`> 242 V`)**, **Overload (`> 2,400 W`)**, or **Overheat (`>= 70°C`)** occurs.
+   * Action: Relay opens (`TRIPPED`) instantaneously, stopping power flow.
+2. **Timer Auto-Cutoff:** When countdown reaches `00:00`, the plug automatically cuts off power (`OFF`).
+3. **Off-Peak Auto-On:** When the simulated clock enters the selected country's Off-Peak window (and relay is not in safety lockout), the plug turns `ON` if enabled.
+4. **Daily Schedule Auto-On / Auto-Off:** Matches enabled schedule `Start Time` and `End Time`.
 
 ### FR-4: Daily On/Off Scheduling
-- Users can create, edit, toggle, and delete multiple daily schedule slots inside the simulated smartphone app.
-- Each schedule entry includes:
-  - **Days Active:** Multi-select (`Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`, `Sun`, or `Every Day`).
-  - **Start Time (`HH:MM`):** Triggers Auto-On.
-  - **End Time (`HH:MM`):** Triggers Auto-Off.
-  - **Active Toggle:** Enable or disable individual schedule rules without deleting them.
-- **Pre-loaded Demo Schedules:** Come pre-configured with realistic examples (e.g., *Water Heater Off-Peak Heating `23:15 – 00:15`*, *AC Night Comfort `22:00 – 05:00`*) so judges immediately see scheduled automation in action.
+* Users can create, edit, toggle, and delete multiple daily schedule slots inside the simulated smartphone app (`Mon to Sun`, `Start Time`, `End Time`, `Active Toggle`).
+* Pre-loaded realistic demo schedules (*Water Heater Off-Peak Heating `23:15 to 00:15`*, *AC Night Comfort `22:00 to 05:00`*).
 
-### FR-5: Anomaly Voltage Detection & Instant Mobile Alert
-- **Normal Grid Voltage Window:** `207 V – 240 V` (Nominal `220 V` / `230 V` based on country).
-- **Demo Anomaly Simulation Triggers:**
-  - `Simulate Undervoltage (Sag ~175 V)`
-  - `Simulate Overvoltage (Surge ~265 V)`
-  - `Simulate Overload (>2,400 W Spike)`
-  - `Restore Normal Voltage`
-- **Mandatory Automated Response on Anomaly:**
-  1. **Instant Relay Cutoff:** Power is cut within `< 50 ms` (simulated), setting relay state to `TRIPPED` and dropping load to `0 W`.
-  2. **Instant Smartphone Push Notification:** A high-priority mobile push notification banner slides down at the top of the simulated smartphone screen (e.g., *"⚠️ CRITICAL VOLTAGE SURGE (265V) DETECTED! EcoShift Plug automatically cut power to protect your Water Heater."*), accompanied by a visual pulse/alert sound toggle.
-  3. **Safety Latch & Reset:** The plug remains safely `OFF` until grid voltage returns to normal (`207 V – 240 V`) and the user taps **"Reset Safety Lock"** on the phone app or plug.
-  4. **Anomaly History Log:** Records timestamp, anomaly type, peak/dip reading, protected appliance, and action taken (`Auto-Cutoff + Mobile Alert Sent`).
+### FR-5: Electrical Safety (SPLN 1:1995), Heat Monitoring (SNI IEC 60884-1), and WhatsApp Alerts
+* **PLN Voltage Standard (SPLN 1:1995 / Permen ESDM):**
+  * Nominal voltage: `220 V` (`50 Hz`) for Indonesia (`230 V` for UK/MY/SG/DE).
+  * Safe operating band: `198 V to 231 V` (maximum upper tolerance `242 V`, or ±10% of `220 V`).
+  * **High-Voltage Warning Band (`232 V to 242 V`):** Displayed as a high-voltage warning status without tripping.
+  * **Undervoltage (`< 198 V`):** Immediate Relay OFF (`TRIPPED`), anomaly log entry, and WhatsApp notification.
+  * **Overvoltage (`> 242 V`):** Immediate Relay OFF (`TRIPPED`), anomaly log entry, and WhatsApp notification.
+* **Socket Capacity and Thermal Standard (SNI IEC 60884-1):**
+  * Socket rated capacity: `2,400 W to 2,500 W` (`10A / 250V`). Overload trip threshold: `> 2,400 W`.
+  * Maximum terminal temperature rise: `45 K` above ambient (`~25°C to 28°C`), keeping safe surface/insulation temperature strictly below `70°C` (critical threshold `70°C to 85°C`).
+  * **Thermal Status Bands:**
+    * `Normal`: `28°C to 55°C`
+    * `Warm` (Advisory): `56°C to 69°C`
+    * `Overheat` (Danger `>= 70°C`): Immediate Relay OFF (`TRIPPED`), anomaly log entry, and WhatsApp notification.
+  * **Realistic Thermal Simulation:** Plug temperature rises gradually when high-power loads (`Water Heater`, `AC`) run continuously, cools down toward ambient (`28°C`) when the relay is `OFF` or under light load, and includes an instant **`Simulate Overheat (>70°C)`** preset trigger.
+* **WhatsApp Virtual Mockup (`EcoShift Guard`):**
+  * Top pop-up WhatsApp notification banner on the smartphone screen plus a dedicated **WhatsApp** tab showing messages from **EcoShift Guard** containing event type, sensor readings (`V`, `°C`, `W`), simulation timestamp, and device action status (`Power Automatically Cut Off` or `Lightning Protection Standby`).
 
-### FR-6: Country-Based Monthly Bill & Off-Peak Savings Estimator
-- **Regulatory Country Selector:** Switching countries dynamically updates currency, tariff rates, peak/off-peak schedule windows, and grid carbon intensity:
+### FR-6: Extreme Weather Integration (Google Weather API + Simulation Presets)
+* **API Integration:** Fetches real-time weather conditions from Google Maps Platform Weather API (`https://weather.googleapis.com/v1/currentConditions:lookup`) using `VITE_GOOGLE_WEATHER_API_KEY` and the selected country's city coordinates (e.g., Jakarta for Indonesia, London for UK, Kuala Lumpur for Malaysia, Singapore for Singapore, Berlin for Germany).
+* **Security and Fallback:** Never hardcodes API keys. Uses `import.meta.env.VITE_GOOGLE_WEATHER_API_KEY`, validates API responses, and falls back gracefully to local simulated weather if offline or unconfigured.
+* **Demo Weather Controls:** `Live API`, `Clear (Normal)`, `Heavy Rain`, and `Thunderstorm`.
+* **Weather Alert Logic:** When `THUNDERSTORM` or `HEAVY_RAIN` is detected, displays a live lightning/surge hazard banner in the simulator and smartphone screen, and dispatches a **Lightning Protection Standby** WhatsApp notification via **EcoShift Guard** (relay remains on standby unless a voltage surge occurs).
 
-| Country | Regulation Type | Currency | Peak Window & Rate | Off-Peak Window & Rate | Grid Carbon Intensity (Peak $\rightarrow$ Off-Peak) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Indonesia (PLN R1/R2)** | **Flat Tariff** (24h uniform residential rate) | `IDR (Rp)` | `00:00 – 24:00` (All Day)<br>**Rp 1,444.70 / kWh** | *Regulatory Note:* Flat rate (`Rp 1,444.70 / kWh`). Off-peak window `22:00 – 05:00` tracks grid load shifting. | `780 gCO2/kWh` $\rightarrow$ `610 gCO2/kWh` |
-| **United Kingdom (Economy 7 TOU)** | **Time-of-Use (TOU)** | `GBP (£)` | `07:30 – 00:30`<br>**£0.29 / kWh** | `00:30 – 07:30`<br>**£0.13 / kWh** | `260 gCO2/kWh` $\rightarrow$ `140 gCO2/kWh` |
-| **Malaysia (TNB Domestic TOU)** | **Time-of-Use (TOU)** | `MYR (RM)` | `08:00 – 22:00`<br>**RM 0.57 / kWh** | `22:00 – 08:00`<br>**RM 0.28 / kWh** | `690 gCO2/kWh` $\rightarrow$ `540 gCO2/kWh` |
-| **Singapore (OEM TOU Plan)** | **Time-of-Use (TOU)** | `SGD (S$)` | `07:00 – 23:00`<br>**S$ 0.33 / kWh** | `23:00 – 07:00`<br>**S$ 0.19 / kWh** | `410 gCO2/kWh` $\rightarrow$ `350 gCO2/kWh` |
-| **Germany (EU Dynamic TOU)** | **Time-of-Use (TOU)** | `EUR (€)` | `06:00 – 23:00`<br>**€0.38 / kWh** | `23:00 – 06:00`<br>**€0.18 / kWh** | `440 gCO2/kWh` $\rightarrow$ `220 gCO2/kWh` |
+### FR-7: Country-Based Monthly Bill and Off-Peak Savings Estimator
+* Supports **Indonesia (PLN Flat Tariff)**, **United Kingdom (Economy 7 TOU)**, **Malaysia (TNB Domestic TOU)**, **Singapore (OEM TOU Plan)**, and **Germany (EU Dynamic TOU)**.
+* Indonesia (`isTOU: false`) strictly calculates `Off-Peak Tariff Savings = Rp 0` while reporting Peak Load Reduction (`kW`) and `CO2` Emissions Avoided (`kg`).
 
-- **Monthly Bill Breakdown:**
-  - Projects 30-day energy consumption ($\text{kWh}$) split into **Peak Hour Consumption** and **Off-Peak Hour Consumption**.
-  - Displays **Estimated Monthly Bill** in the selected country's local currency, visually distinguishing Peak Cost vs. Off-Peak Cost.
-- **Off-Peak Savings Calculation Rule:**
-  - Savings are **strictly calculated from Off-Peak Hour energy consumption** adjusted to the selected country's regulation:
-    - **For TOU Countries (UK, Malaysia, Singapore, Germany):**
-      $$\text{Off-Peak Savings} = \text{kWh}_{\text{off-peak}} \times (\text{Rate}_{\text{peak}} - \text{Rate}_{\text{off-peak}})$$
-    - **For Indonesia (Flat Tariff):**
-      $$\text{Off-Peak Tariff Savings} = \text{Rp } 0$$
-      UI displays a clear regulatory badge: *"Indonesia Residential Tariff (PLN): Flat Rate — Financial arbitrage is Rp 0; sustainability impact is measured via Peak Load Reduction ($\text{kW}$) and $\text{CO}_2$ Emissions Avoided ($\text{kg}$)."*
+## 5. Acceptance Criteria Checklist
 
----
-
-## 5. Acceptance Criteria Checklist for AI Agent
-
-- [ ] **Zero Hardware Dependencies:** App runs smoothly offline/client-side without network errors.
-- [ ] **Single-Socket & 4 Appliances:** Only 1 smart plug socket is modeled, supporting `Water Heater`, `Charger`, `Dispenser`, and `AC`.
-- [ ] **No Excluded Features:** Zero references to Eco-Reward Points, unit pricing, multi-socket strips, water meters, AI load shifting, or "Auto-Save Mode".
-- [ ] **Deterministic Automation:** Countdown timer and overload trigger Auto-Cutoff; Daily Schedule and Off-Peak entry trigger Auto-On.
-- [ ] **Anomaly Protection Flow:** Clicking any voltage/overload anomaly button immediately trips the plug `OFF` and triggers a visible push notification on the simulated smartphone screen.
-- [ ] **Country Tariff Accuracy:** Switching between Indonesia (Flat) and UK/Malaysia/Singapore/Germany (TOU) immediately recalculates the monthly bill and updates Off-Peak savings according to each country's regulations.
-- [ ] **Day/Night Sync:** Advancing virtual time transitions the simulator room scene between daytime and nighttime aesthetics.
+* **Single-Socket and 4 Appliances:** Only 1 smart plug socket is modeled, supporting `Water Heater`, `AC`, `Dispenser`, and `Charger`.
+* **No Excluded Features:** Zero references to Eco-Reward Points, unit pricing, multi-socket strips, water meters, AI load shifting, or "Auto-Save Mode".
+* **SPLN 1:1995 and SNI IEC 60884-1 Compliance:** Undervoltage (`< 198 V`), Overvoltage (`> 242 V`), Overload (`> 2,400 W`), and Overheat (`>= 70°C`) immediately trip the relay `OFF`, log the anomaly, and send a WhatsApp alert.
+* **Weather Integration and Fallback:** Live Google Weather API lookup works with valid `VITE_GOOGLE_WEATHER_API_KEY` and falls back cleanly when absent/offline; manual weather presets (`Clear`, `Heavy Rain`, `Thunderstorm`) trigger banners and WhatsApp standby alerts.
+* **Strict Visual Rules:** Zero emojis and zero `---` or `~~` separators in UI or documentation.

@@ -1,45 +1,37 @@
-# Technical Architecture & Implementation Guide (`arsitektur.md`)
-## EcoShift Home — Interactive Web Simulator & Pitch Platform
-
----
+# Technical Architecture and Implementation Guide (`Architecture_EcoShift.md`)
+## EcoShift Home: Interactive Web Simulator and Pitch Platform
 
 ## 1. Architectural Overview
 
-- **Architecture Pattern:** `100% Client-Side Single-Page Application (SPA)` with a deterministic discrete-time simulation engine.
-- **Zero External Runtime Dependencies:** All tariff rules, grid carbon intensities, appliance profiles, virtual clock ticks, and mobile notifications run locally in browser memory. This guarantees **zero latency and zero network failure risk** during live competition presentations.
-- **Recommended Tech Stack:**
-  - **Framework:** React 18+ with TypeScript (`Vite` build tool)
-  - **Styling:** Tailwind CSS v3/v4
-  - **Icons:** `lucide-react`
-  - **Charts/Sparklines:** Custom lightweight responsive SVG components (faster, sharper, and zero hydration/resize bugs compared to heavy chart libraries)
+* **Architecture Pattern:** Client-Side Single-Page Application (SPA) with a deterministic discrete-time simulation engine (`250ms` tick interval) and optional Google Maps Platform Weather API integration.
+* **Resilient Offline-First Fallback:** All tariff rules, grid carbon intensities, appliance profiles, thermal physics, virtual clock ticks, and WhatsApp mockup notifications run locally in browser memory. Weather lookup uses `VITE_GOOGLE_WEATHER_API_KEY` when configured and falls back cleanly to local weather simulation when offline or unconfigured.
+* **Tech Stack:**
+  * **Framework:** React 19 with TypeScript (`Vite` build tool)
+  * **Styling:** Tailwind CSS v4
+  * **Icons:** `lucide-react`
+  * **Charts/Sparklines:** Custom lightweight responsive SVG components
 
----
-+
 ## 2. System Data Flow
 
 ```text
 +-------------------------------------------------------------------+
-|                     SIMULATION ENGINE (useInterval)               |
-|  Advances virtualClock by (deltaSeconds * speedMultiplier)        |
+|                     SIMULATION ENGINE (250ms Tick)                |
+|  - Advances virtualClock by (deltaSeconds * speedMultiplier)      |
+|  - Updates plugTemperatureC (thermal rise/cool physics)           |
+|  - Polls / applies Weather Condition (Live API or Preset)         |
 +---------------------------------+---------------------------------+
                                   |
                                   v
 +-------------------------------------------------------------------+
 |                  AUTOMATION & SAFETY EVALUATOR                    |
-|  1. Check Voltage Anomaly (<195V or >245V) & Overload (>2200W)    |
-|     -> If TRUE: Trip Relay OFF, emit Mobile Push + Anomaly Log    |
-|  2. Check Countdown Timer <= 0 -> Cut Relay OFF                   |
-|  3. Check Off-Peak Window Entry (if autoOnOffPeak) -> Turn ON     |
-|  4. Check Daily Schedule Match (Start -> ON, End -> OFF)          |
-+---------------------------------+---------------------------------+
-                                  |
-                                  v
-+-------------------------------------------------------------------+
-|               ELECTRICAL & BILLING CALCULATOR                     |
-|  - Computes live Voltage (V), Current (A), Active Power (W)       |
-|  - Accumulates Peak kWh & Off-Peak kWh                            |
-|  - Projects 30-Day Monthly Bill using Selected Country Tariff     |
-|  - Computes Off-Peak Savings (TOU countries) & CO2 Avoided (kg)   |
+|  1. SPLN 1:1995 Voltage (<198V or >242V), SNI IEC 60884-1         |
+|     Overload (>2,400W), & Thermal Overheat (>=70C)                |
+|     -> If TRUE: Trip Relay OFF, emit Push + WhatsApp + Log        |
+|  2. Weather Advisory (HEAVY_RAIN / THUNDERSTORM)                  |
+|     -> Show Standby Banner + emit EcoShift Guard WhatsApp alert   |
+|  3. Countdown Timer <= 0 -> Cut Relay OFF                         |
+|  4. Off-Peak Window Entry (if autoOnOffPeak) -> Turn ON           |
+|  5. Daily Schedule Match (Start -> ON, End -> OFF)                |
 +---------------------------------+---------------------------------+
                                   |
          +------------------------+------------------------+
@@ -47,283 +39,72 @@
 +-----------------+     +------------------+     +------------------+
 |  Hardware Twin  |     | Smartphone Frame |     | Billing & Logs   |
 | (Day/Night Room |     | (Push Alerts,    |     | (Country Rules,  |
-|  & 1-Plug LED)  |     |  Timer, Schedule)|     |  Sparkline, Log) |
+|  1-Plug LED &   |     |  Controls Tab &  |     |  Sparkline, Temp,|
+|  Thermal Glow)  |     |  WhatsApp Tab)   |     |  & Anomaly Log)  |
 +-----------------+     +------------------+     +------------------+
 ```
 
----
-
 ## 3. Core Data Models (`src/types/simulator.ts`)
 
-```typescript
-export type CountryCode = 'ID' | 'UK' | 'MY' | 'SG' | 'DE';
+* **CountryTariffConfig:** Adds city coordinates (`city`, `latitude`, `longitude`) for weather lookup alongside `nominalVoltage`, `peakRate`, `offPeakRate`, `offPeakStartMinutes`, `offPeakEndMinutes`, `peakCarbonGPerKwh`, and `offPeakCarbonGPerKwh`.
+* **FaultInjection:** `'NONE' | 'UNDERVOLTAGE' | 'OVERVOLTAGE' | 'OVERLOAD' | 'OVERHEAT'`.
+* **AnomalyType:** `'UNDERVOLTAGE' | 'OVERVOLTAGE' | 'OVERLOAD' | 'OVERHEAT'`.
+* **ThermalStatus:** `'NORMAL' | 'WARM' | 'OVERHEAT'` (`28°C to 55°C` Normal, `56°C to 69°C` Warm, `>= 70°C` Overheat).
+* **WeatherMode:** `'LIVE_API' | 'CLEAR' | 'HEAVY_RAIN' | 'THUNDERSTORM'`.
+* **WeatherCondition:** `'CLEAR' | 'HEAVY_RAIN' | 'THUNDERSTORM'`.
+* **WeatherState:** `{ mode, condition, source, city, temperatureC, description, lastUpdated, isLoading, error }`.
+* **WhatsAppMessage:** `{ id, eventTitle, eventType, voltageV, temperatureC, powerW, simulatedTime, actionStatus, severity, timestamp }`.
 
-export interface CountryTariffConfig {
-  code: CountryCode;
-  name: string;
-  flag: string;
-  currencySymbol: string;
-  currencyCode: string;
-  isTOU: boolean; // false for Indonesia (Flat), true for TOU countries
-  regulationLabel: string;
-  regulationNote: string;
-  nominalVoltage: number; // e.g., 220 or 230
-  peakRate: number; // per kWh in local currency
-  offPeakRate: number; // equals peakRate when isTOU === false
-  offPeakStartHour: number; // e.g., 23 for 23:00
-  offPeakEndHour: number; // e.g., 7 for 07:00
-  peakCarbonGPerKwh: number; // gCO2/kWh during peak
-  offPeakCarbonGPerKwh: number; // gCO2/kWh during off-peak
-}
+## 4. Safety, Thermal, and Weather Specifications
 
-export type ApplianceId = 'water_heater' | 'ac' | 'dispenser' | 'charger';
+### 4.1 Electrical Safety Standards (SPLN 1:1995 / Permen ESDM)
+* **Nominal Grid Voltage:** `220 V` (`50 Hz`) for Indonesia (`230 V` for UK, Malaysia, Singapore, Germany).
+* **Safe Operating Band:** `198 V to 231 V` (maximum upper tolerance `242 V`, ±10% of `220 V`).
+* **High-Voltage Warning Band:** `232 V to 242 V` displays an advisory warning without tripping.
+* **Safety Cutoff Thresholds:**
+  * `UNDERVOLTAGE`: `< 198 V` (Fault trigger injects `~176.4 V`) -> Instant Relay `TRIPPED`.
+  * `OVERVOLTAGE`: `> 242 V` (Fault trigger injects `~264.8 V`) -> Instant Relay `TRIPPED`.
+  * `OVERLOAD`: `> 2,400 W` (SNI IEC 60884-1 `10A / 250V` limit; fault trigger injects `2,480 W`) -> Instant Relay `TRIPPED`.
 
-export interface AppliancePreset {
-  id: ApplianceId;
-  name: string;
-  wattage: number;
-  category: string;
-  description: string;
-  defaultDailyHours: number; // baseline usage for 30-day projection
-}
+### 4.2 Thermal Monitoring and Physics (SNI IEC 60884-1)
+* **Standard Basis:** Maximum terminal temperature rise of `45 K` above ambient (`~25°C to 28°C`), keeping safe operating surface temperature strictly below `70°C` (critical danger zone `70°C to 85°C`).
+* **Thermal Status:**
+  * `NORMAL`: `28°C to 55°C`
+  * `WARM`: `56°C to 69°C`
+  * `OVERHEAT`: `>= 70°C` -> Instant Relay `TRIPPED`, anomaly logged, and WhatsApp alert dispatched.
+* **Discrete-Time Thermal Model:**
+  * Ambient baseline: `28.0°C`.
+  * Target steady-state temperature when `ON`: scales with appliance wattage (`Water Heater 1,500 W` approaches `67°C`, `AC 900 W` approaches `58°C`, `Dispenser 350 W` approaches `42°C`, `Charger 65 W` approaches `33°C`).
+  * Each tick advances temperature smoothly toward target when `ON` (accelerated proportionally with simulation speed, capped for visual stability) and cools gradually toward `28.0°C` when `OFF` or `TRIPPED`.
+  * **Instant Overheat Preset:** `triggerFault('OVERHEAT')` spikes plug temperature to `74.5°C` (`>= 70°C`), immediately tripping the relay and firing both the push banner and `EcoShift Guard` WhatsApp message.
 
-export type RelayState = 'ON' | 'OFF' | 'TRIPPED';
+### 4.3 Google Weather API Integration (`src/services/weatherService.ts`)
+* **Endpoint:** `https://weather.googleapis.com/v1/currentConditions:lookup?key=${apiKey}&location.latitude=${lat}&location.longitude=${lon}`
+* **API Key Handling:** Read exclusively via `import.meta.env.VITE_GOOGLE_WEATHER_API_KEY`. Never hardcoded.
+* **Response Mapping & Validation:** Validates HTTP `200`, JSON structure, and `weatherCondition.type` (mapping thunderstorm types to `THUNDERSTORM`, heavy rain/downpour types to `HEAVY_RAIN`, and all other valid types to `CLEAR`).
+* **Fallback Behavior:** If `VITE_GOOGLE_WEATHER_API_KEY` is missing or the request fails/times out, the service returns a deterministic local simulated weather state (`source: 'SIMULATED_FALLBACK'`) so live demos never break.
 
-export interface ScheduleSlot {
-  id: string;
-  days: number[]; // 0 = Sun, 1 = Mon, ..., 6 = Sat
-  startTime: string; // "HH:MM" 24-hour format
-  endTime: string; // "HH:MM" 24-hour format
-  enabled: boolean;
-  label: string;
-}
-
-export type AnomalyType = 'UNDERVOLTAGE' | 'OVERVOLTAGE' | 'OVERLOAD';
-
-export interface AnomalyEvent {
-  id: string;
-  simulatedTimestamp: string;
-  type: AnomalyType;
-  measuredValue: string; // e.g., "264.5 V" or "2,450 W"
-  applianceName: string;
-  actionTaken: string; // "Auto-Cutoff + Mobile Push Sent"
-}
-
-export interface MobileNotification {
-  id: string;
-  title: string;
-  message: string;
-  timestamp: string;
-  severity: 'critical' | 'info';
-  read: boolean;
-}
-```
-
----
-
-## 4. Reference Datasets (`src/data/`)
-
-### 4.1 Country Tariff Configurations (`src/data/countries.ts`)
-```typescript
-export const COUNTRY_CONFIGS: Record<CountryCode, CountryTariffConfig> = {
-  ID: {
-    code: 'ID',
-    name: 'Indonesia (PLN Residential)',
-    flag: '🇮🇩',
-    currencySymbol: 'Rp ',
-    currencyCode: 'IDR',
-    isTOU: false,
-    regulationLabel: 'Flat Residential Tariff (R1/R2)',
-    regulationNote:
-      'Indonesia applies a uniform 24-hour residential tariff. Financial TOU arbitrage is Rp 0; off-peak shifting reduces grid peak stress and CO2 emissions.',
-    nominalVoltage: 220,
-    peakRate: 1444.7,
-    offPeakRate: 1444.7,
-    offPeakStartHour: 22,
-    offPeakEndHour: 5,
-    peakCarbonGPerKwh: 780,
-    offPeakCarbonGPerKwh: 610,
-  },
-  UK: {
-    code: 'UK',
-    name: 'United Kingdom (Economy 7 TOU)',
-    flag: '🇬🇧',
-    currencySymbol: '£',
-    currencyCode: 'GBP',
-    isTOU: true,
-    regulationLabel: 'Time-of-Use (Economy 7)',
-    regulationNote:
-      'UK Economy 7 regulations offer ~55% lower electricity rates during night off-peak hours (00:00–07:00).',
-    nominalVoltage: 230,
-    peakRate: 0.29,
-    offPeakRate: 0.13,
-    offPeakStartHour: 0,
-    offPeakEndHour: 7,
-    peakCarbonGPerKwh: 260,
-    offPeakCarbonGPerKwh: 140,
-  },
-  MY: {
-    code: 'MY',
-    name: 'Malaysia (TNB Domestic TOU)',
-    flag: '🇲🇾',
-    currencySymbol: 'RM ',
-    currencyCode: 'MYR',
-    isTOU: true,
-    regulationLabel: 'Time-of-Use (Domestic TOU)',
-    regulationNote:
-      'TNB Time-of-Use scheme lowers residential tariffs by ~50% between 22:00 and 08:00.',
-    nominalVoltage: 230,
-    peakRate: 0.57,
-    offPeakRate: 0.28,
-    offPeakStartHour: 22,
-    offPeakEndHour: 8,
-    peakCarbonGPerKwh: 690,
-    offPeakCarbonGPerKwh: 540,
-  },
-  SG: {
-    code: 'SG',
-    name: 'Singapore (OEM TOU Plan)',
-    flag: '🇸🇬',
-    currencySymbol: 'S$',
-    currencyCode: 'SGD',
-    isTOU: true,
-    regulationLabel: 'Time-of-Use (Off-Peak Plan)',
-    regulationNote:
-      'Singapore Open Electricity Market TOU plans discount night consumption between 23:00 and 07:00.',
-    nominalVoltage: 230,
-    peakRate: 0.33,
-    offPeakRate: 0.19,
-    offPeakStartHour: 23,
-    offPeakEndHour: 7,
-    peakCarbonGPerKwh: 410,
-    offPeakCarbonGPerKwh: 350,
-  },
-  DE: {
-    code: 'DE',
-    name: 'Germany (EU Dynamic TOU)',
-    flag: '🇩🇪',
-    currencySymbol: '€',
-    currencyCode: 'EUR',
-    isTOU: true,
-    regulationLabel: 'Dynamic Time-of-Use Tariff',
-    regulationNote:
-      'German dynamic smart-meter tariffs reward shifting high loads to wind-abundant off-peak hours (23:00–06:00).',
-    nominalVoltage: 230,
-    peakRate: 0.38,
-    offPeakRate: 0.18,
-    offPeakStartHour: 23,
-    offPeakEndHour: 6,
-    peakCarbonGPerKwh: 440,
-    offPeakCarbonGPerKwh: 220,
-  },
-};
-```
-
-### 4.2 Appliance Presets (`src/data/appliances.ts`)
-```typescript
-export const APPLIANCE_PRESETS: AppliancePreset[] = [
-  {
-    id: 'water_heater',
-    name: 'Water Heater',
-    wattage: 1500,
-    category: 'Thermal Heating',
-    description: 'High-wattage tank heater ideal for off-peak pre-heating.',
-    defaultDailyHours: 1.5,
-  },
-  {
-    id: 'ac',
-    name: 'Air Conditioner (AC)',
-    wattage: 900,
-    category: 'Climate Control',
-    description: '1 PK bedroom AC scheduled for night off-peak cooling.',
-    defaultDailyHours: 6.0,
-  },
-  {
-    id: 'dispenser',
-    name: 'Water Dispenser',
-    wattage: 350,
-    category: 'Kitchen Appliance',
-    description: 'Hot/cold water dispenser scheduled off during sleeping hours.',
-    defaultDailyHours: 4.0,
-  },
-  {
-    id: 'charger',
-    name: 'Fast Charger (Laptop/Phone)',
-    wattage: 65,
-    category: 'Personal Electronics',
-    description: 'USB-C PD charger protected by countdown auto-cutoff.',
-    defaultDailyHours: 3.0,
-  },
-];
-```
-
----
-
-## 5. Mathematical & Simulation Engine Specifications
-
-### 5.1 Off-Peak Window Check (`isOffPeakHour`)
-Handles overnight windows that cross midnight (e.g., `22:00` to `05:00`) as well as same-day windows (`00:00` to `07:00`):
-```typescript
-export function isOffPeakHour(hour: number, country: CountryTariffConfig): boolean {
-  const { offPeakStartHour, offPeakEndHour } = country;
-  if (offPeakStartHour > offPeakEndHour) {
-    // Crosses midnight (e.g., 22:00 -> 05:00)
-    return hour >= offPeakStartHour || hour < offPeakEndHour;
-  }
-  // Same-day window (e.g., 00:00 -> 07:00)
-  return hour >= offPeakStartHour && hour < offPeakEndHour;
-}
-```
-
-### 5.2 Voltage Anomaly & Safety Cutoff Logic
-- **Normal Range:** `207.0 V <= voltage <= 240.0 V` and `power <= 2200 W`.
-- **Natural Jitter:** When no fault is injected, voltage fluctuates subtly around `country.nominalVoltage` by `Math.sin(tick) * 1.1` Volts.
-- **Fault Triggers:**
-  - `UNDERVOLTAGE`: Sets `injectedVoltage = 176.4` (`< 195 V`).
-  - `OVERVOLTAGE`: Sets `injectedVoltage = 264.8` (`> 245 V`).
-  - `OVERLOAD`: Sets `injectedPower = 2480` (`> 2,200 W`).
-- **Immediate Trip Execution:**
-  1. Set `relayState = 'TRIPPED'`.
-  2. Push new `MobileNotification` with `severity: 'critical'` to `notifications` array and set `activeBannerNotification` to trigger slide-down toast inside the Smartphone Frame.
-  3. Append `AnomalyEvent` to `anomalyLogs`.
-
-### 5.3 Monthly Bill, Off-Peak Savings & Carbon Formulas
-To ensure the Monthly Bill Estimator feels immediately responsive when judges toggle schedules, switch appliances, or change countries, calculate the **30-Day Monthly Projection** by combining configured schedule hours (or baseline appliance usage) split across Peak vs. Off-Peak windows:
-
-1. **Daily Scheduled Hours Split:**
-   - Calculate `dailyOffPeakHours` and `dailyPeakHours` from enabled `ScheduleSlot` entries (or if no schedule is enabled, allocate based on `autoOnOffPeak` toggle: if `autoOnOffPeak === true`, 75% of `appliance.defaultDailyHours` runs in Off-Peak; otherwise 80% runs in Peak).
-2. **Monthly Energy ($\text{kWh}$):**
-   $$\text{kWh}_{\text{peak}} = \frac{\text{ApplianceWattage} \times \text{dailyPeakHours} \times 30}{1000}$$
-   $$\text{kWh}_{\text{offPeak}} = \frac{\text{ApplianceWattage} \times \text{dailyOffPeakHours} \times 30}{1000}$$
-3. **Monthly Cost (Local Currency):**
-   $$\text{Cost}_{\text{peak}} = \text{kWh}_{\text{peak}} \times \text{country.peakRate}$$
-   $$\text{Cost}_{\text{offPeak}} = \text{kWh}_{\text{offPeak}} \times \text{country.offPeakRate}$$
-   $$\text{TotalMonthlyBill} = \text{Cost}_{\text{peak}} + \text{Cost}_{\text{offPeak}}$$
-4. **Off-Peak Savings (Strict Regulatory Rule):**
-   $$\text{OffPeakSavings} = \begin{cases} \text{kWh}_{\text{offPeak}} \times (\text{country.peakRate} - \text{country.offPeakRate}), & \text{if } \text{country.isTOU} = \text{true} \\ 0, & \text{if } \text{country.isTOU} = \text{false (Indonesia Flat)} \end{cases}$$
-5. **Carbon Emissions Avoided ($\text{kg CO}_2/\text{month}$):**
-   $$\text{CO}_{2,\text{avoided}} = \frac{\text{kWh}_{\text{offPeak}} \times (\text{country.peakCarbonGPerKwh} - \text{country.offPeakCarbonGPerKwh})}{1000}$$
-
----
-
-## 6. Recommended Folder Structure
+## 5. Folder Structure
 
 ```text
-ecoshift-home-demo/
+ecoshift/
 ├── index.html
 ├── package.json
-├── tailwind.config.js
 └── src/
     ├── main.tsx
     ├── App.tsx
+    ├── index.css
     ├── types/
-    │   └── simulator.ts          # All TypeScript interfaces
+    │   └── simulator.ts                 # TypeScript interfaces for grid, thermal, weather, WhatsApp
     ├── data/
-    │   ├── countries.ts          # ID, UK, MY, SG, DE tariff & grid regulations
-    │   └── appliances.ts         # Water Heater, AC, Dispenser, Charger presets
+    │   ├── countries.ts                 # ID, UK, MY, SG, DE tariffs & city coordinates
+    │   └── appliances.ts                # Water Heater, AC, Dispenser, Charger presets
+    ├── services/
+    │   └── weatherService.ts            # Google Weather API client + local fallback
     ├── engine/
-    │   ├── useSimulatorEngine.ts # Master hook: virtual clock, rules, telemetry, billing
-    │   └── billingCalculator.ts  # Pure functions for monthly bill, savings & CO2
+    │   ├── useSimulatorEngine.ts        # Master hook: clock, thermal, safety, weather, WhatsApp
+    │   ├── billingCalculator.ts         # Pure functions for monthly bill, savings & CO2
+    │   └── billingCalculator.test.ts    # Vitest unit tests
     └── components/
         ├── layout/
         │   ├── Navbar.tsx
@@ -333,36 +114,10 @@ ecoshift-home-demo/
         │   ├── ProblemSolutionSection.tsx
         │   └── SustainabilityBmcSection.tsx
         └── simulator/
-            ├── SimulatorWorkbench.tsx   # 3-Column container + Demo Control Bar
-            ├── DemoControlBar.tsx       # Speed multipliers, Time Jump, Fault Triggers
-            ├── HardwarePlugTwin.tsx     # Day/Night Room Scene + 1-Socket Smart Plug
-            ├── SmartphoneAppFrame.tsx   # Mobile bezel, Push Notification, Timer, Schedule
-            ├── BillingAnalyticsPanel.tsx# Country selector, Voltage sparkline, Bill & Savings
+            ├── SimulatorWorkbench.tsx   # 3-Column container + Weather banner + Control Bar
+            ├── DemoControlBar.tsx       # Speed, Time Jump, Fault/Overheat, Weather Controls
+            ├── HardwarePlugTwin.tsx     # Day/Night Room + 1-Socket Plug + Thermal Indicator
+            ├── SmartphoneAppFrame.tsx   # Controls Tab + WhatsApp (EcoShift Guard) Tab
+            ├── BillingAnalyticsPanel.tsx# Country selector, Sparkline, Temp, Bill & Savings
             └── AnomalyLogTable.tsx      # Historical log of safety cutoffs & alerts
 ```
-
----
-
-## 7. Step-by-Step AI Agent Implementation Plan
-
-Execute the build in the following sequential order to ensure clean compilation and zero logic bugs:
-
-1. **Phase 1 — Project Initialization & Constants:**
-   - Scaffold Vite + React + TypeScript + Tailwind CSS + `lucide-react`.
-   - Load Google Fonts (`Plus Jakarta Sans`, `Inter`, `JetBrains Mono`) in `index.html`.
-   - Create `src/types/simulator.ts`, `src/data/countries.ts`, and `src/data/appliances.ts`.
-2. **Phase 2 — Core Simulation & Billing Engine:**
-   - Implement `src/engine/billingCalculator.ts` with unit-tested pure functions for Flat vs. TOU tariff calculations and $\text{CO}_2$ savings.
-   - Implement `src/engine/useSimulatorEngine.ts` managing the `250ms` interval tick, speed multipliers (`0x` to `1800x`), countdown timer, daily schedules, off-peak auto-on transitions, and anomaly trip/notification triggers.
-3. **Phase 3 — Interactive Simulator Components:**
-   - Build `DemoControlBar.tsx` (time controls + anomaly injection buttons + reset button).
-   - Build `HardwarePlugTwin.tsx` with smooth Day/Night sky/room transitions and the 1-socket smart plug LED ring + 4 appliance selector cards.
-   - Build `SmartphoneAppFrame.tsx` with the slide-down mobile push notification overlay, power button, countdown timer, off-peak toggle, and daily schedule CRUD modal/list.
-   - Build `BillingAnalyticsPanel.tsx` and `AnomalyLogTable.tsx` with live SVG voltage sparkline and Peak vs. Off-Peak monthly bill breakdown.
-4. **Phase 4 — Pitch Landing Page Assembly:**
-   - Build `Navbar.tsx`, `HeroSection.tsx`, `ProblemSolutionSection.tsx`, and `SustainabilityBmcSection.tsx` tailored for International Sustainability BMC Judges (ensuring **no unit pricing** and **no eco-points** appear anywhere).
-   - Assemble the full page in `src/App.tsx`.
-5. **Phase 5 — End-to-End Demo Verification:**
-   - Verify switching between `Indonesia (Flat)` and `United Kingdom (TOU)` updates currency and sets Off-Peak Monetary Savings to `Rp 0` for Indonesia vs. positive savings for UK.
-   - Verify clicking `Simulate Overvoltage` immediately trips the plug `OFF` and displays the push notification on the smartphone frame.
-   - Verify advancing time past `18:00` transitions the room from Daytime to Nighttime.

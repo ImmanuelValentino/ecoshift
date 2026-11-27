@@ -6,6 +6,7 @@ import {
   Power,
   ShieldAlert,
   Sun,
+  Thermometer,
   Wind,
 } from 'lucide-react';
 import { APPLIANCE_PRESETS } from '../../data/appliances';
@@ -39,12 +40,16 @@ export function HardwarePlugTwin({ engine }: HardwarePlugTwinProps) {
     sessionKwh,
     activePowerW,
     faultInjection,
+    plugTemperatureC,
+    thermalStatus,
     resetSafetyLock,
   } = engine;
 
   const isDay = clock.isDaytime;
   const isOn = relayState === 'ON';
   const isTripped = relayState === 'TRIPPED';
+  const isWarm = thermalStatus === 'WARM';
+  const isOverheat = thermalStatus === 'OVERHEAT';
 
   const ledColor = isTripped ? '#DC2626' : isOn ? '#10B981' : '#86868B';
   const relayLabel = isTripped
@@ -52,6 +57,12 @@ export function HardwarePlugTwin({ engine }: HardwarePlugTwinProps) {
     : isOn
       ? 'ON (CLOSED)'
       : 'OFF (OPEN)';
+
+  const thermalBadgeLabel = isOverheat
+    ? 'OVERHEAT'
+    : isWarm
+      ? 'WARM'
+      : 'NORMAL';
 
   return (
     <div className="bg-white rounded-3xl border border-black/[0.08] p-4 sm:p-5 flex flex-col justify-between gap-4 shadow-xs">
@@ -116,18 +127,47 @@ export function HardwarePlugTwin({ engine }: HardwarePlugTwinProps) {
           />
         )}
 
+        {/* Subtle Reduced Thermal Glow on Plug when Warm or Overheat */}
+        {(isWarm || isOverheat) && (
+          <div
+            className="pointer-events-none absolute inset-0 transition-opacity duration-500"
+            style={{
+              background: isOverheat
+                ? 'radial-gradient(circle at 22% 58%, rgba(220, 38, 38, 0.14) 0%, rgba(220, 38, 38, 0.03) 34%, transparent 56%)'
+                : 'radial-gradient(circle at 22% 58%, rgba(245, 158, 11, 0.11) 0%, rgba(245, 158, 11, 0.02) 32%, transparent 52%)',
+            }}
+          />
+        )}
+
         {/* Top Bar inside Room Scene */}
-        <div className="relative z-10 flex items-center justify-between px-3.5 pt-3">
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider transition-colors duration-600 ${
-              isDay
-                ? 'bg-[#FEF3C7] text-[#92400E]'
-                : 'bg-[#1E1B4B] text-[#C7D2FE]'
-            }`}
-          >
-            {isDay ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
-            {isDay ? 'DAYTIME' : 'NIGHTTIME'}
-          </span>
+        <div className="relative z-10 flex items-center justify-between gap-2 px-3.5 pt-3">
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider transition-colors duration-600 ${
+                isDay
+                  ? 'bg-[#FEF3C7] text-[#92400E]'
+                  : 'bg-[#1E1B4B] text-[#C7D2FE]'
+              }`}
+            >
+              {isDay ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+              {isDay ? 'DAYTIME' : 'NIGHTTIME'}
+            </span>
+
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-mono text-[10px] font-semibold tabular-nums transition-colors ${
+                isOverheat
+                  ? 'bg-red-100 text-[#DC2626]'
+                  : isWarm
+                    ? 'bg-amber-100 text-[#B45309]'
+                    : isDay
+                      ? 'bg-white/90 text-[#1D1D1F] border border-black/[0.06]'
+                      : 'bg-slate-800/90 text-slate-200 border border-slate-700'
+              }`}
+            >
+              <Thermometer className="w-3 h-3" />
+              {plugTemperatureC.toFixed(1)}°C ({thermalBadgeLabel})
+            </span>
+          </div>
 
           <span
             className={`font-mono text-[11px] font-semibold tabular-nums transition-colors duration-600 ${
@@ -273,8 +313,8 @@ export function HardwarePlugTwin({ engine }: HardwarePlugTwinProps) {
               height="80"
               rx="18"
               fill="url(#plugBodyGrad)"
-              stroke="#CBD5E1"
-              strokeWidth="1.2"
+              stroke={isOverheat ? '#FCA5A5' : isWarm ? '#FCD34D' : '#CBD5E1'}
+              strokeWidth={isOverheat || isWarm ? '1.8' : '1.2'}
             />
 
             {/* Status LED Ring */}

@@ -17,6 +17,9 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
     liveVoltage,
     activeCurrentA,
     activePowerW,
+    plugTemperatureC,
+    thermalStatus,
+    voltageStatus,
     voltageHistory,
     monthlyProjection,
     anomalyLogs,
@@ -42,8 +45,9 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
 
-  const safeTopY = mapY(240);
-  const safeBottomY = mapY(207);
+  const safeTopY = mapY(231);
+  const safeBottomY = mapY(198);
+  const maxToleranceY = mapY(242);
 
   const totalCost = monthlyProjection.totalMonthlyBill;
   const peakSharePct =
@@ -117,19 +121,21 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
             </h4>
           </div>
           <span className="text-[10px] font-mono text-[#6E6E73]">
-            Safe Band: 207V – 240V
+            SPLN: 198V–231V (Max 242V)
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="bg-[#F5F5F7] rounded-xl p-2 text-center">
             <span className="text-[10px] text-[#6E6E73] block">Voltage</span>
             <span
-              className={`font-mono text-sm font-bold tabular-nums ${
-                faultInjection === 'UNDERVOLTAGE' ||
-                faultInjection === 'OVERVOLTAGE'
+              className={`font-mono text-xs sm:text-sm font-bold tabular-nums ${
+                voltageStatus === 'UNDERVOLTAGE' ||
+                voltageStatus === 'OVERVOLTAGE'
                   ? 'text-[#DC2626]'
-                  : 'text-[#1D1D1F]'
+                  : voltageStatus === 'HIGH_WARNING'
+                    ? 'text-[#D97706]'
+                    : 'text-[#1D1D1F]'
               }`}
             >
               {liveVoltage.toFixed(1)} V
@@ -137,17 +143,37 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
           </div>
           <div className="bg-[#F5F5F7] rounded-xl p-2 text-center">
             <span className="text-[10px] text-[#6E6E73] block">Current</span>
-            <span className="font-mono text-sm font-bold text-[#1D1D1F] tabular-nums">
+            <span className="font-mono text-xs sm:text-sm font-bold text-[#1D1D1F] tabular-nums">
               {activeCurrentA.toFixed(2)} A
             </span>
           </div>
           <div className="bg-[#F5F5F7] rounded-xl p-2 text-center">
             <span className="text-[10px] text-[#6E6E73] block">Power</span>
-            <span className="font-mono text-sm font-bold text-[#047857] tabular-nums">
+            <span className="font-mono text-xs sm:text-sm font-bold text-[#047857] tabular-nums">
               {activePowerW.toLocaleString('en-US')} W
             </span>
           </div>
+          <div className="bg-[#F5F5F7] rounded-xl p-2 text-center">
+            <span className="text-[10px] text-[#6E6E73] block">Plug Temp</span>
+            <span
+              className={`font-mono text-xs sm:text-sm font-bold tabular-nums ${
+                thermalStatus === 'OVERHEAT'
+                  ? 'text-[#DC2626]'
+                  : thermalStatus === 'WARM'
+                    ? 'text-[#D97706]'
+                    : 'text-[#1D1D1F]'
+              }`}
+            >
+              {plugTemperatureC.toFixed(1)}°C
+            </span>
+          </div>
         </div>
+
+        {voltageStatus === 'HIGH_WARNING' && (
+          <p className="text-[11px] font-medium text-[#B45309] bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1">
+            High Voltage Warning (232V–242V): Approaching SPLN 1:1995 upper limit.
+          </p>
+        )}
 
         {/* SVG Voltage Waveform Sparkline */}
         <div className="rounded-xl bg-[#F8FAFC] border border-black/[0.05] p-2">
@@ -156,7 +182,7 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
             className="w-full h-[54px] overflow-visible"
             aria-label="Live voltage telemetry waveform"
           >
-            {/* Safe operating band (207V - 240V) */}
+            {/* Safe operating band (198V - 231V) */}
             <rect
               x="0"
               y={safeTopY}
@@ -164,6 +190,16 @@ export function BillingAnalyticsPanel({ engine }: BillingAnalyticsPanelProps) {
               height={Math.max(2, safeBottomY - safeTopY)}
               fill="#10B981"
               fillOpacity="0.1"
+            />
+            {/* Upper tolerance 242V line */}
+            <line
+              x1="0"
+              y1={maxToleranceY}
+              x2={svgW}
+              y2={maxToleranceY}
+              stroke="#D97706"
+              strokeOpacity="0.45"
+              strokeDasharray="2 3"
             />
             <line
               x1="0"

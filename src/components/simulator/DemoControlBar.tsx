@@ -1,10 +1,14 @@
 import {
   AlertTriangle,
   Clock,
+  CloudLightning,
+  CloudRain,
   FastForward,
+  Flame,
   Moon,
   Pause,
   Play,
+  Radio,
   RotateCcw,
   ShieldCheck,
   Sun,
@@ -12,7 +16,7 @@ import {
   ZapOff,
 } from 'lucide-react';
 import { SimulatorEngine } from '../../engine/useSimulatorEngine';
-import { SpeedMultiplier } from '../../types/simulator';
+import { SpeedMultiplier, WeatherMode } from '../../types/simulator';
 
 interface DemoControlBarProps {
   engine: SimulatorEngine;
@@ -33,23 +37,31 @@ const TIME_JUMPS: { hour: number; minute: number; label: string }[] = [
   { hour: 23, minute: 5, label: '23:05 Off-Peak' },
 ];
 
+const WEATHER_OPTIONS: { mode: WeatherMode; label: string }[] = [
+  { mode: 'LIVE_API', label: 'Live API' },
+  { mode: 'CLEAR', label: 'Clear (Normal)' },
+  { mode: 'HEAVY_RAIN', label: 'Heavy Rain' },
+  { mode: 'THUNDERSTORM', label: 'Thunderstorm' },
+];
+
 export function DemoControlBar({ engine }: DemoControlBarProps) {
   const {
     clock,
     isCurrentlyOffPeak,
     speedMultiplier,
     faultInjection,
+    weather,
     setSpeedMultiplier,
     jumpToTime,
     triggerFault,
+    setWeatherMode,
     resetDemo,
   } = engine;
 
   return (
-    <div className="bg-white rounded-2xl border border-black/[0.08] p-3.5 sm:p-4 shadow-xs space-y-3">
-      {/* Top Row: Virtual Clock, Speed, and Time Jumps */}
+    <div className="w-full bg-white rounded-2xl border border-black/[0.08] p-3.5 sm:p-4 shadow-xs space-y-3">
+      {/* Top Row: Virtual Clock, Speed, and Weather Pill */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Virtual Clock + Environment Badges */}
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center gap-2 bg-[#F5F5F7] px-3 py-1.5 rounded-xl border border-black/[0.06]">
             <Clock className="w-4 h-4 text-[#6E6E73]" />
@@ -120,9 +132,8 @@ export function DemoControlBar({ engine }: DemoControlBarProps) {
         </div>
       </div>
 
-      {/* Bottom Row: Time Jump Presets + Fault Simulation Triggers + Reset */}
+      {/* Middle Row: Time Jump Presets + Fault & Thermal Simulation Triggers */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-black/[0.06]">
-        {/* Quick Time Jump Presets */}
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6E6E73] mr-1">
             Jump Time
@@ -139,10 +150,9 @@ export function DemoControlBar({ engine }: DemoControlBarProps) {
           ))}
         </div>
 
-        {/* Anomaly Fault Triggers + Reset */}
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6E6E73] mr-1">
-            Grid Fault Test
+            Safety &amp; Thermal Test
           </span>
           <button
             type="button"
@@ -183,6 +193,19 @@ export function DemoControlBar({ engine }: DemoControlBarProps) {
             Overload 2,480W
           </button>
 
+          <button
+            type="button"
+            onClick={() => triggerFault('OVERHEAT')}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+              faultInjection === 'OVERHEAT'
+                ? 'bg-[#DC2626] text-white border-[#DC2626]'
+                : 'bg-orange-50/80 text-[#C2410C] border-orange-200 hover:bg-orange-100'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5" />
+            Simulate Overheat (&gt;70°C)
+          </button>
+
           {faultInjection !== 'NONE' && (
             <button
               type="button"
@@ -190,22 +213,67 @@ export function DemoControlBar({ engine }: DemoControlBarProps) {
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#10B981] text-white hover:bg-[#059669] transition-colors cursor-pointer"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              Restore Normal Voltage
+              Restore Normal
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={resetDemo}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white text-[#6E6E73] hover:text-[#1D1D1F] border border-black/[0.1] hover:bg-[#F5F5F7] transition-colors cursor-pointer ml-1"
-            title="Reset simulator to default state"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset Demo
-          </button>
         </div>
+      </div>
+
+      {/* Bottom Row: Weather Protection Controls + Reset */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-black/[0.06]">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6E6E73] mr-1">
+            Weather ({weather.city})
+          </span>
+          {WEATHER_OPTIONS.map((opt) => {
+            const active = weather.mode === opt.mode;
+            const isStorm = opt.mode === 'THUNDERSTORM';
+            const isRain = opt.mode === 'HEAVY_RAIN';
+            return (
+              <button
+                key={opt.mode}
+                type="button"
+                onClick={() => setWeatherMode(opt.mode)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                  active
+                    ? isStorm
+                      ? 'bg-[#B45309] text-white border-[#B45309]'
+                      : isRain
+                        ? 'bg-[#1D4ED8] text-white border-[#1D4ED8]'
+                        : 'bg-[#1D1D1F] text-white border-[#1D1D1F]'
+                    : 'bg-[#F5F5F7] text-[#1D1D1F] border-black/[0.06] hover:bg-[#EAEAEF]'
+                }`}
+              >
+                {opt.mode === 'LIVE_API' ? (
+                  <Radio className="w-3 h-3" />
+                ) : opt.mode === 'THUNDERSTORM' ? (
+                  <CloudLightning className="w-3 h-3" />
+                ) : opt.mode === 'HEAVY_RAIN' ? (
+                  <CloudRain className="w-3 h-3" />
+                ) : (
+                  <Sun className="w-3 h-3" />
+                )}
+                {opt.label}
+              </button>
+            );
+          })}
+          <span className="text-[11px] text-[#6E6E73] ml-1">
+            {weather.isLoading
+              ? 'Syncing weather...'
+              : `${weather.description} (${weather.ambientTempC}°C)`}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={resetDemo}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white text-[#6E6E73] hover:text-[#1D1D1F] border border-black/[0.1] hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+          title="Reset simulator to default state"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Reset Demo
+        </button>
       </div>
     </div>
   );
 }
-

@@ -10,7 +10,7 @@ export function App() {
   const engine = useSimulatorEngine();
 
   return (
-    <div className="min-h-screen flex flex-col bg-white text-[#1D1D1F]">
+    <div className="min-h-screen flex flex-col bg-white text-[#1D1D1F] overflow-x-hidden">
       <Navbar activeCountry={engine.country} />
       <main className="flex-1">
         <HeroSection />

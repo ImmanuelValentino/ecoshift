@@ -4,6 +4,9 @@ export interface CountryTariffConfig {
   code: CountryCode;
   name: string;
   shortName: string;
+  city: string;
+  latitude: number;
+  longitude: number;
   currencySymbol: string;
   currencyCode: string;
   isTOU: boolean;
@@ -36,7 +39,34 @@ export type RelayState = 'ON' | 'OFF' | 'TRIPPED';
 
 export type SpeedMultiplier = 0 | 1 | 60 | 300 | 1800;
 
-export type FaultInjection = 'NONE' | 'UNDERVOLTAGE' | 'OVERVOLTAGE' | 'OVERLOAD';
+export type FaultInjection =
+  | 'NONE'
+  | 'UNDERVOLTAGE'
+  | 'OVERVOLTAGE'
+  | 'OVERLOAD'
+  | 'OVERHEAT';
+
+export type ThermalStatus = 'NORMAL' | 'WARM' | 'OVERHEAT';
+
+export type VoltageStatus = 'NORMAL' | 'HIGH_WARNING' | 'UNDERVOLTAGE' | 'OVERVOLTAGE';
+
+export type WeatherMode = 'LIVE_API' | 'CLEAR' | 'HEAVY_RAIN' | 'THUNDERSTORM';
+
+export type WeatherCondition = 'CLEAR' | 'HEAVY_RAIN' | 'THUNDERSTORM';
+
+export type WeatherSource = 'GOOGLE_API' | 'SIMULATED_FALLBACK' | 'MANUAL_PRESET';
+
+export interface WeatherState {
+  mode: WeatherMode;
+  condition: WeatherCondition;
+  source: WeatherSource;
+  city: string;
+  ambientTempC: number;
+  description: string;
+  lastUpdated: string;
+  isLoading: boolean;
+  error: string | null;
+}
 
 export interface ScheduleSlot {
   id: string;
@@ -47,7 +77,7 @@ export interface ScheduleSlot {
   label: string;
 }
 
-export type AnomalyType = 'UNDERVOLTAGE' | 'OVERVOLTAGE' | 'OVERLOAD';
+export type AnomalyType = 'UNDERVOLTAGE' | 'OVERVOLTAGE' | 'OVERLOAD' | 'OVERHEAT';
 
 export interface AnomalyEvent {
   id: string;
@@ -63,8 +93,29 @@ export interface MobileNotification {
   title: string;
   message: string;
   timestamp: string;
-  severity: 'critical' | 'info';
+  severity: 'critical' | 'warning' | 'info';
+  channel?: 'ECOSHIFT' | 'WHATSAPP';
   read: boolean;
+}
+
+export type WhatsAppEventType =
+  | 'UNDERVOLTAGE'
+  | 'OVERVOLTAGE'
+  | 'OVERLOAD'
+  | 'OVERHEAT'
+  | 'EXTREME_WEATHER';
+
+export interface WhatsAppMessage {
+  id: string;
+  eventType: WhatsAppEventType;
+  eventTitle: string;
+  voltageV: number;
+  temperatureC: number;
+  powerW: number;
+  simulatedTime: string;
+  actionStatus: string;
+  severity: 'critical' | 'warning';
+  detail: string;
 }
 
 export interface MonthlyProjection {
@@ -87,4 +138,3 @@ export interface VoltagePoint {
   voltage: number;
   isAnomaly: boolean;
 }
-

@@ -6,7 +6,7 @@ export function HeroSection() {
       id="overview"
       className="bg-white pt-16 pb-16 sm:pt-24 sm:pb-20 border-b border-black/[0.05]"
     >
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {/* Eyebrow */}
         <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#047857] mb-5">
           <Leaf className="w-3.5 h-3.5" />

@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { APPLIANCE_PRESETS, DAY_NAMES_SHORT, DEFAULT_SCHEDULES } from '../data/appliances';
 import { COUNTRY_CONFIGS } from '../data/countries';
 import {
+  buildFallbackWeatherState,
+  buildPresetWeatherState,
+  fetchLiveWeatherForCountry,
+} from '../services/weatherService';
+import {
   AnomalyEvent,
   AnomalyType,
   ApplianceId,
@@ -11,7 +16,13 @@ import {
   RelayState,
   ScheduleSlot,
   SpeedMultiplier,
+  ThermalStatus,
   VoltagePoint,
+  VoltageStatus,
+  WeatherMode,
+  WeatherState,
+  WhatsAppEventType,
+  WhatsAppMessage,
 } from '../types/simulator';
 import {
   calculateMonthlyProjection,
@@ -24,6 +35,28 @@ const WEEK_SECONDS = 7 * 86400;
 const INITIAL_CLOCK_SECONDS = 1 * 86400 + 14 * 3600 + 30 * 60;
 const TICK_MS = 250;
 const MAX_VOLTAGE_POINTS = 32;
+const AMBIENT_PLUG_TEMP_C = 28.0;
+const INITIAL_PLUG_TEMP_C = 34.5;
+
+export function getThermalStatus(tempC: number): ThermalStatus {
+  if (tempC >= 70) return 'OVERHEAT';
+  if (tempC >= 56) return 'WARM';
+  return 'NORMAL';
+}
+
+export function getVoltageStatus(voltage: number): VoltageStatus {
+  if (voltage < 198) return 'UNDERVOLTAGE';
+  if (voltage > 242) return 'OVERVOLTAGE';
+  if (voltage >= 232) return 'HIGH_WARNING';
+  return 'NORMAL';
+}
+
+function getSteadyStateTempForWattage(wattage: number): number {
+  if (wattage >= 1400) return 66.5; // Water Heater: climbs into Warm (56-69C) under sustained run
+  if (wattage >= 800) return 58.0; // AC: reaches Warm advisory band
+  if (wattage >= 300) return 41.5; // Dispenser: stays Normal
+  return 32.5; // Charger: stays cool
+}
 
 export function decodeClock(totalSeconds: number) {
   const wrapped = ((Math.floor(totalSeconds) % WEEK_SECONDS) + WEEK_SECONDS) % WEEK_SECONDS;
@@ -68,6 +101,7 @@ export function useSimulatorEngine() {
   const [clockSeconds, setClockSeconds] = useState<number>(INITIAL_CLOCK_SECONDS);
   const [speedMultiplier, setSpeedMultiplier] = useState<SpeedMultiplier>(60);
   const [faultInjection, setFaultInjection] = useState<FaultInjection>('NONE');
+  const [plugTemperatureC, setPlugTemperatureC] = useState<number>(INITIAL_PLUG_TEMP_C);
 
   const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
   const [autoOnOffPeak, setAutoOnOffPeak] = useState<boolean>(true);
@@ -76,11 +110,16 @@ export function useSimulatorEngine() {
 
   const [notifications, setNotifications] = useState<MobileNotification[]>([]);
   const [activeBanner, setActiveBanner] = useState<MobileNotification | null>(null);
+  const [whatsappMessages, setWhatsappMessages] = useState<WhatsAppMessage[]>([]);
   const [anomalyLogs, setAnomalyLogs] = useState<AnomalyEvent[]>([]);
   const [voltageHistory, setVoltageHistory] = useState<VoltagePoint[]>(() =>
     buildInitialVoltageHistory(COUNTRY_CONFIGS.ID.nominalVoltage)
   );
   const [tickCount, setTickCount] = useState<number>(MAX_VOLTAGE_POINTS);
+
+  const [weather, setWeather] = useState<WeatherState>(() =>
+    buildFallbackWeatherState(COUNTRY_CONFIGS.ID)
+  );
 
   const country = COUNTRY_CONFIGS[countryCode];
   const appliance = useMemo(
@@ -88,7 +127,6 @@ export function useSimulatorEngine() {
     [applianceId]
   );
 
-  // Refs for reading latest state inside interval without recreating it every tick
   const stateRef = useRef({
     country,
     appliance,
@@ -96,10 +134,12 @@ export function useSimulatorEngine() {
     clockSeconds,
     speedMultiplier,
     faultInjection,
+    plugTemperatureC,
     timerRemainingSeconds,
     autoOnOffPeak,
     schedules,
     tickCount,
+    voltageHistory,
   });
 
   stateRef.current = {
@@ -109,25 +149,34 @@ export function useSimulatorEngine() {
     clockSeconds,
     speedMultiplier,
     faultInjection,
+    plugTemperatureC,
     timerRemainingSeconds,
     autoOnOffPeak,
     schedules,
     tickCount,
+    voltageHistory,
   };
 
   const bannerTimeoutRef = useRef<number | null>(null);
 
   const pushNotification = useCallback(
-    (title: string, message: string, severity: 'critical' | 'info', timestamp: string) => {
+    (
+      title: string,
+      message: string,
+      severity: 'critical' | 'warning' | 'info',
+      timestamp: string,
+      channel: 'ECOSHIFT' | 'WHATSAPP' = 'ECOSHIFT'
+    ) => {
       const notif: MobileNotification = {
         id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         title,
         message,
         timestamp,
         severity,
+        channel,
         read: false,
       };
-      setNotifications((prev) => [notif, ...prev].slice(0, 12));
+      setNotifications((prev) => [notif, ...prev].slice(0, 15));
       setActiveBanner(notif);
 
       if (bannerTimeoutRef.current !== null) {
@@ -135,7 +184,7 @@ export function useSimulatorEngine() {
       }
       bannerTimeoutRef.current = window.setTimeout(() => {
         setActiveBanner((current) => (current?.id === notif.id ? null : current));
-      }, 6500);
+      }, 7000);
     },
     []
   );
@@ -148,24 +197,78 @@ export function useSimulatorEngine() {
     }
   }, []);
 
+  const pushWhatsAppAlert = useCallback(
+    (params: {
+      eventType: WhatsAppEventType;
+      eventTitle: string;
+      voltageV: number;
+      temperatureC: number;
+      powerW: number;
+      simulatedTime: string;
+      actionStatus: string;
+      severity: 'critical' | 'warning';
+      detail: string;
+    }) => {
+      const msg: WhatsAppMessage = {
+        id: `wa-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        ...params,
+      };
+      setWhatsappMessages((prev) => [msg, ...prev].slice(0, 20));
+    },
+    []
+  );
+
   const executeSafetyTrip = useCallback(
-    (type: AnomalyType, measuredValue: string, timestamp: string, appName: string) => {
+    (
+      type: AnomalyType,
+      measuredValue: string,
+      timestamp: string,
+      appName: string,
+      sensorSnapshot: { voltageV: number; temperatureC: number; powerW: number }
+    ) => {
       setRelayState('TRIPPED');
       setTimerRemainingSeconds(null);
 
       const titleMap: Record<AnomalyType, string> = {
-        UNDERVOLTAGE: 'Power Cut Off: Undervoltage Sag',
-        OVERVOLTAGE: 'Power Cut Off: Voltage Surge',
-        OVERLOAD: 'Power Cut Off: Overload Detected',
+        UNDERVOLTAGE: 'WhatsApp: EcoShift Guard',
+        OVERVOLTAGE: 'WhatsApp: EcoShift Guard',
+        OVERLOAD: 'WhatsApp: EcoShift Guard',
+        OVERHEAT: 'WhatsApp: EcoShift Guard',
+      };
+
+      const eventTitleMap: Record<AnomalyType, string> = {
+        UNDERVOLTAGE: 'Undervoltage Detected (<198V)',
+        OVERVOLTAGE: 'Overvoltage Surge Detected (>242V)',
+        OVERLOAD: 'Socket Overload (>2,400W)',
+        OVERHEAT: 'Thermal Overheat (>=70°C)',
       };
 
       const detailMap: Record<AnomalyType, string> = {
-        UNDERVOLTAGE: `${measuredValue} sag detected. Relay opened in <50ms to protect ${appName}.`,
-        OVERVOLTAGE: `${measuredValue} surge detected. Relay opened in <50ms to protect ${appName}.`,
-        OVERLOAD: `${measuredValue} spike exceeded 2,200W limit. Relay opened to protect ${appName}.`,
+        UNDERVOLTAGE: `${measuredValue} sag violated SPLN 1:1995 (<198V). Power cut off to protect ${appName}.`,
+        OVERVOLTAGE: `${measuredValue} surge violated SPLN 1:1995 (>242V). Power cut off to protect ${appName}.`,
+        OVERLOAD: `${measuredValue} exceeded SNI IEC 60884-1 2,400W capacity. Power cut off for ${appName}.`,
+        OVERHEAT: `Plug temperature reached ${measuredValue} (SNI IEC 60884-1 limit 70°C). Power cut off for ${appName}.`,
       };
 
-      pushNotification(titleMap[type], detailMap[type], 'critical', timestamp);
+      pushNotification(
+        titleMap[type],
+        detailMap[type],
+        'critical',
+        timestamp,
+        'WHATSAPP'
+      );
+
+      pushWhatsAppAlert({
+        eventType: type,
+        eventTitle: eventTitleMap[type],
+        voltageV: sensorSnapshot.voltageV,
+        temperatureC: sensorSnapshot.temperatureC,
+        powerW: sensorSnapshot.powerW,
+        simulatedTime: timestamp,
+        actionStatus: 'Power Automatically Cut Off',
+        severity: 'critical',
+        detail: detailMap[type],
+      });
 
       const logEntry: AnomalyEvent = {
         id: `anom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -173,11 +276,11 @@ export function useSimulatorEngine() {
         type,
         measuredValue,
         applianceName: appName,
-        actionTaken: 'Auto-Cutoff + Mobile Alert Sent',
+        actionTaken: 'Auto-Cutoff + WhatsApp Alert Sent',
       };
       setAnomalyLogs((prev) => [logEntry, ...prev].slice(0, 20));
     },
-    [pushNotification]
+    [pushNotification, pushWhatsAppAlert]
   );
 
   // Instant fault injection trigger (called from DemoControlBar)
@@ -185,9 +288,12 @@ export function useSimulatorEngine() {
     (fault: FaultInjection) => {
       const s = stateRef.current;
       const clock = decodeClock(s.clockSeconds);
+      const currentVoltage =
+        s.voltageHistory[s.voltageHistory.length - 1]?.voltage ?? s.country.nominalVoltage;
 
       if (fault === 'NONE') {
         setFaultInjection('NONE');
+        setPlugTemperatureC((prev) => (prev >= 70 ? 36.0 : prev));
         setVoltageHistory((prev) => [
           ...prev.slice(-(MAX_VOLTAGE_POINTS - 1)),
           { tick: s.tickCount + 1, voltage: s.country.nominalVoltage, isAnomaly: false },
@@ -203,25 +309,130 @@ export function useSimulatorEngine() {
           ...prev.slice(-(MAX_VOLTAGE_POINTS - 1)),
           { tick: s.tickCount + 1, voltage: measured, isAnomaly: true },
         ]);
-        executeSafetyTrip('UNDERVOLTAGE', `${measured.toFixed(1)} V`, clock.formattedFull, s.appliance.name);
+        executeSafetyTrip('UNDERVOLTAGE', `${measured.toFixed(1)} V`, clock.formattedFull, s.appliance.name, {
+          voltageV: measured,
+          temperatureC: s.plugTemperatureC,
+          powerW: s.relayState === 'ON' ? s.appliance.wattage : 0,
+        });
       } else if (fault === 'OVERVOLTAGE') {
         const measured = 264.8;
         setVoltageHistory((prev) => [
           ...prev.slice(-(MAX_VOLTAGE_POINTS - 1)),
           { tick: s.tickCount + 1, voltage: measured, isAnomaly: true },
         ]);
-        executeSafetyTrip('OVERVOLTAGE', `${measured.toFixed(1)} V`, clock.formattedFull, s.appliance.name);
+        executeSafetyTrip('OVERVOLTAGE', `${measured.toFixed(1)} V`, clock.formattedFull, s.appliance.name, {
+          voltageV: measured,
+          temperatureC: s.plugTemperatureC,
+          powerW: s.relayState === 'ON' ? s.appliance.wattage : 0,
+        });
       } else if (fault === 'OVERLOAD') {
         const measured = 2480;
+        const vDuringFault = Number((s.country.nominalVoltage - 4.2).toFixed(1));
         setVoltageHistory((prev) => [
           ...prev.slice(-(MAX_VOLTAGE_POINTS - 1)),
-          { tick: s.tickCount + 1, voltage: s.country.nominalVoltage - 4.2, isAnomaly: true },
+          { tick: s.tickCount + 1, voltage: vDuringFault, isAnomaly: true },
         ]);
-        executeSafetyTrip('OVERLOAD', `${measured.toLocaleString('en-US')} W`, clock.formattedFull, s.appliance.name);
+        executeSafetyTrip(
+          'OVERLOAD',
+          `${measured.toLocaleString('en-US')} W`,
+          clock.formattedFull,
+          s.appliance.name,
+          {
+            voltageV: vDuringFault,
+            temperatureC: s.plugTemperatureC,
+            powerW: measured,
+          }
+        );
+      } else if (fault === 'OVERHEAT') {
+        const overheatTemp = 74.6;
+        setPlugTemperatureC(overheatTemp);
+        executeSafetyTrip(
+          'OVERHEAT',
+          `${overheatTemp.toFixed(1)} °C`,
+          clock.formattedFull,
+          s.appliance.name,
+          {
+            voltageV: currentVoltage,
+            temperatureC: overheatTemp,
+            powerW: s.relayState === 'ON' ? s.appliance.wattage : 0,
+          }
+        );
       }
     },
     [executeSafetyTrip]
   );
+
+  // Weather Mode & Live API handling
+  const emitWeatherWhatsAppIfExtreme = useCallback(
+    (nextWeather: WeatherState) => {
+      if (nextWeather.condition !== 'HEAVY_RAIN' && nextWeather.condition !== 'THUNDERSTORM') {
+        return;
+      }
+      const s = stateRef.current;
+      const clock = decodeClock(s.clockSeconds);
+      const currentVoltage =
+        s.voltageHistory[s.voltageHistory.length - 1]?.voltage ?? s.country.nominalVoltage;
+      const currentPower = s.relayState === 'ON' ? s.appliance.wattage : 0;
+      const isStorm = nextWeather.condition === 'THUNDERSTORM';
+      const title = isStorm
+        ? `Thunderstorm Alert (${nextWeather.city})`
+        : `Heavy Rain Advisory (${nextWeather.city})`;
+      const detail = isStorm
+        ? `Severe thunderstorm detected in ${nextWeather.city}. Lightning surge protection is active on standby.`
+        : `Heavy rainfall detected in ${nextWeather.city}. Grid surge monitoring heightened.`;
+
+      pushNotification('WhatsApp: EcoShift Guard', detail, 'warning', clock.formattedFull, 'WHATSAPP');
+      pushWhatsAppAlert({
+        eventType: 'EXTREME_WEATHER',
+        eventTitle: title,
+        voltageV: currentVoltage,
+        temperatureC: s.plugTemperatureC,
+        powerW: currentPower,
+        simulatedTime: clock.formattedFull,
+        actionStatus: 'Lightning Protection Standby',
+        severity: 'warning',
+        detail,
+      });
+    },
+    [pushNotification, pushWhatsAppAlert]
+  );
+
+  const setWeatherMode = useCallback(
+    async (mode: WeatherMode) => {
+      const s = stateRef.current;
+      if (mode === 'LIVE_API') {
+        setWeather((prev) => ({ ...prev, mode: 'LIVE_API', isLoading: true }));
+        const result = await fetchLiveWeatherForCountry(s.country);
+        setWeather(result);
+        emitWeatherWhatsAppIfExtreme(result);
+        return;
+      }
+      const preset = buildPresetWeatherState(mode, s.country);
+      setWeather(preset);
+      emitWeatherWhatsAppIfExtreme(preset);
+    },
+    [emitWeatherWhatsAppIfExtreme]
+  );
+
+  // Fetch initial weather on mount (with clean fallback if key missing)
+  useEffect(() => {
+    const controller = new AbortController();
+    let mounted = true;
+    fetchLiveWeatherForCountry(COUNTRY_CONFIGS.ID, controller.signal)
+      .then((res) => {
+        if (mounted) {
+          setWeather(res);
+          emitWeatherWhatsAppIfExtreme(res);
+        }
+      })
+      .catch(() => {
+        // Ignore abort errors
+      });
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [emitWeatherWhatsAppIfExtreme]);
 
   const toggleRelay = useCallback(() => {
     const s = stateRef.current;
@@ -231,7 +442,7 @@ export function useSimulatorEngine() {
       if (s.faultInjection !== 'NONE') {
         pushNotification(
           'Safety Lockout Active',
-          'Grid anomaly is still present. Restore Normal Voltage before resetting safety lock.',
+          'Grid or thermal fault is still active. Restore Normal state before resetting safety lock.',
           'critical',
           clock.formattedFull
         );
@@ -240,7 +451,7 @@ export function useSimulatorEngine() {
       setRelayState('OFF');
       pushNotification(
         'Safety Lock Reset',
-        `Grid voltage verified normal (${s.country.nominalVoltage}V). Plug is ready in standby.`,
+        `Grid voltage (${s.country.nominalVoltage}V) and plug temperature (${s.plugTemperatureC.toFixed(1)}°C) verified safe.`,
         'info',
         clock.formattedFull
       );
@@ -260,10 +471,9 @@ export function useSimulatorEngine() {
     const clock = decodeClock(s.clockSeconds);
 
     if (s.faultInjection !== 'NONE') {
-      // Automatically inform user that voltage must be normal first
       pushNotification(
-        'Grid Voltage Unstable',
-        'Restore Normal Voltage in the Demo Control Bar before clearing Safety Lock.',
+        'Fault Still Active',
+        'Restore Normal state in the Demo Control Bar before clearing Safety Lock.',
         'critical',
         clock.formattedFull
       );
@@ -273,7 +483,7 @@ export function useSimulatorEngine() {
     setRelayState('OFF');
     pushNotification(
       'Safety Lock Cleared',
-      `EcoShift Smart Plug reset safely. Voltage nominal at ${s.country.nominalVoltage}V.`,
+      `EcoShift Smart Plug reset safely. Voltage ${s.country.nominalVoltage}V, Temp ${s.plugTemperatureC.toFixed(1)}°C.`,
       'info',
       clock.formattedFull
     );
@@ -285,7 +495,6 @@ export function useSimulatorEngine() {
       return;
     }
     setTimerRemainingSeconds(minutes * 60);
-    // If plug is OFF (not tripped), turn it ON when user starts a countdown timer
     setRelayState((prev) => (prev === 'OFF' ? 'ON' : prev));
   }, []);
 
@@ -313,11 +522,32 @@ export function useSimulatorEngine() {
     [pushNotification]
   );
 
-  const selectCountry = useCallback((code: CountryCode) => {
-    setCountryCode(code);
-    const nextCountry = COUNTRY_CONFIGS[code];
-    setVoltageHistory(buildInitialVoltageHistory(nextCountry.nominalVoltage));
-  }, []);
+  const selectCountry = useCallback(
+    (code: CountryCode) => {
+      setCountryCode(code);
+      const nextCountry = COUNTRY_CONFIGS[code];
+      setVoltageHistory(buildInitialVoltageHistory(nextCountry.nominalVoltage));
+
+      setWeather((prev) => {
+        if (prev.mode !== 'LIVE_API') {
+          return buildPresetWeatherState(prev.condition, nextCountry);
+        }
+        return { ...prev, city: nextCountry.city, isLoading: true };
+      });
+
+      if (weather.mode === 'LIVE_API') {
+        fetchLiveWeatherForCountry(nextCountry)
+          .then((res) => {
+            setWeather(res);
+            emitWeatherWhatsAppIfExtreme(res);
+          })
+          .catch(() => {
+            // fallback handled inside fetchLiveWeatherForCountry
+          });
+      }
+    },
+    [weather.mode, emitWeatherWhatsAppIfExtreme]
+  );
 
   const addSchedule = useCallback((slot: Omit<ScheduleSlot, 'id'>) => {
     const newSlot: ScheduleSlot = {
@@ -344,15 +574,18 @@ export function useSimulatorEngine() {
     setClockSeconds(INITIAL_CLOCK_SECONDS);
     setSpeedMultiplier(60);
     setFaultInjection('NONE');
+    setPlugTemperatureC(INITIAL_PLUG_TEMP_C);
     setTimerRemainingSeconds(null);
     setAutoOnOffPeak(true);
     setSchedules(DEFAULT_SCHEDULES);
     setSessionKwh(0.42);
     setNotifications([]);
     setActiveBanner(null);
+    setWhatsappMessages([]);
     setAnomalyLogs([]);
     setVoltageHistory(buildInitialVoltageHistory(COUNTRY_CONFIGS.ID.nominalVoltage));
     setTickCount(MAX_VOLTAGE_POINTS);
+    setWeather(buildFallbackWeatherState(COUNTRY_CONFIGS.ID));
   }, []);
 
   // Main 250ms simulation tick loop
@@ -391,6 +624,19 @@ export function useSimulatorEngine() {
 
       const prevClock = decodeClock(prevClockSeconds);
       const nextClock = decodeClock(nextClockSeconds);
+
+      // Realistic thermal simulation (SNI IEC 60884-1)
+      if (s.faultInjection === 'OVERHEAT') {
+        setPlugTemperatureC(74.6 + Math.sin(nextTick * 0.5) * 0.4);
+      } else {
+        const targetTemp =
+          s.relayState === 'ON'
+            ? getSteadyStateTempForWattage(s.appliance.wattage)
+            : AMBIENT_PLUG_TEMP_C;
+        const speedFactor = Math.min(0.14, 0.008 + Math.log10(Math.max(1, s.speedMultiplier)) * 0.028);
+        const nextTemp = s.plugTemperatureC + (targetTemp - s.plugTemperatureC) * speedFactor;
+        setPlugTemperatureC(Number(nextTemp.toFixed(1)));
+      }
 
       // Accumulate session energy if relay is ON
       if (s.relayState === 'ON') {
@@ -434,7 +680,6 @@ export function useSimulatorEngine() {
       }
 
       // Priority 4: Daily Schedule Start/End match
-      // Check all minute marks crossed in this tick (important at 300x / 1800x speed!)
       const prevAbsMinute = Math.floor(prevClockSeconds / 60);
       const nextAbsMinute = Math.floor((prevClockSeconds + deltaSimSeconds) / 60);
       if (nextAbsMinute > prevAbsMinute) {
@@ -486,6 +731,12 @@ export function useSimulatorEngine() {
   const liveVoltage =
     voltageHistory[voltageHistory.length - 1]?.voltage ?? country.nominalVoltage;
 
+  const voltageStatus = useMemo(() => getVoltageStatus(liveVoltage), [liveVoltage]);
+  const thermalStatus = useMemo(
+    () => getThermalStatus(plugTemperatureC),
+    [plugTemperatureC]
+  );
+
   const activePowerW = relayState === 'ON' ? appliance.wattage : 0;
   const activeCurrentA =
     relayState === 'ON' && liveVoltage > 0 ? activePowerW / liveVoltage : 0;
@@ -506,12 +757,17 @@ export function useSimulatorEngine() {
     isCurrentlyOffPeak,
     speedMultiplier,
     faultInjection,
+    plugTemperatureC,
+    thermalStatus,
+    voltageStatus,
+    weather,
     timerRemainingSeconds,
     autoOnOffPeak,
     schedules,
     sessionKwh,
     notifications,
     activeBanner,
+    whatsappMessages,
     anomalyLogs,
     voltageHistory,
 
@@ -529,6 +785,7 @@ export function useSimulatorEngine() {
     setSpeedMultiplier,
     jumpToTime,
     triggerFault,
+    setWeatherMode,
     setCountdownMinutes,
     setAutoOnOffPeak,
     addSchedule,
@@ -540,4 +797,3 @@ export function useSimulatorEngine() {
 }
 
 export type SimulatorEngine = ReturnType<typeof useSimulatorEngine>;
-

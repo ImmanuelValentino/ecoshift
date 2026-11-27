@@ -12,7 +12,7 @@ export function ProblemSolutionSection() {
       id="how-it-works"
       className="py-16 sm:py-20 bg-white border-b border-black/[0.05] scroll-mt-20"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+      <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Problem Context Strip */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
           <div className="lg:col-span-7">
@@ -45,11 +45,12 @@ export function ProblemSolutionSection() {
           <div className="rounded-2xl border border-black/[0.08] bg-white p-5">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#DC2626] mb-2">
               <ShieldAlert className="w-4 h-4" />
-              Unstable Residential Voltage
+              Unstable Voltage &amp; Thermal Risk
             </div>
             <p className="text-sm text-[#6E6E73] leading-relaxed">
-              Sudden brownout sags below 195V or surges above 245V damage
-              compressors, heating elements, and power adapters without warning.
+              Sudden brownout sags below 198V, surges above 242V (SPLN 1:1995),
+              or socket overheating above 70°C (SNI IEC 60884-1) silently damage
+              appliances and create fire hazards.
             </p>
           </div>
           <div className="rounded-2xl border border-black/[0.08] bg-white p-5">
@@ -78,9 +79,10 @@ export function ProblemSolutionSection() {
                 Sub-Second Anomaly Cutoff
               </h3>
               <p className="mt-2.5 text-sm text-[#6E6E73] leading-relaxed">
-                Continuous voltage and current monitoring trips the relay open in
-                under 50ms on sags (&lt;195V), surges (&gt;245V), or overloads
-                (&gt;2,200W) while pushing an instant alert to the companion app.
+                Continuous voltage, load, and thermal monitoring trips the relay
+                open in under 50ms on sags (&lt;198V), surges (&gt;242V),
+                overloads (&gt;2,400W), or overheat (&gt;=70°C) while pushing an
+                instant EcoShift Guard WhatsApp alert.
               </p>
             </div>
           </div>

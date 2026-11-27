@@ -8,7 +8,7 @@ interface NavbarProps {
 export function Navbar({ activeCountry }: NavbarProps) {
   return (
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-black/[0.06]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Left: Brand Identity with Geometric Leaf-Bolt SVG */}
         <a href="#overview" className="flex items-center gap-2.5 group">
           <div className="w-8 h-8 rounded-xl bg-[#1D1D1F] flex items-center justify-center shadow-xs group-hover:bg-[#047857] transition-colors">

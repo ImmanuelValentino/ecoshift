@@ -21,9 +21,9 @@ export function SustainabilityBmcSection({ engine }: SustainabilityBmcSectionPro
       eyebrow: '01. Value Proposition',
       title: 'Plug-and-Play Protection & Decarbonization',
       points: [
-        'Instant sub-50ms voltage anomaly and overload cutoff with mobile push alerts.',
+        'Instant sub-50ms cutoff for SPLN 1:1995 voltage faults (<198V / >242V) and SNI IEC 60884-1 overheat (>=70°C).',
+        'Extreme weather lightning standby with automated EcoShift Guard WhatsApp notifications.',
         'Deterministic daily schedules, countdown timers, and country-aligned off-peak auto-on.',
-        'Zero rewiring required: retrofits any existing high-load appliance in seconds.',
       ],
     },
     {
@@ -83,7 +83,7 @@ export function SustainabilityBmcSection({ engine }: SustainabilityBmcSectionPro
       id="bmc"
       className="py-16 sm:py-24 bg-white border-t border-black/[0.05] scroll-mt-20"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mb-12">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#047857] mb-2">
             Sustainability Business Model Canvas
