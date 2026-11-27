@@ -74,6 +74,7 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
     clock,
     country,
     sockets,
+    dailyHistory,
     activeSockets,
     isSafetyLocked,
     faultInjection,
@@ -102,6 +103,7 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
 
   const [activeTab, setActiveTab] = useState<PhoneTab>('dashboard');
   const [seenWhatsAppCount, setSeenWhatsAppCount] = useState(0);
+  const [selectedDayIdx, setSelectedDayIdx] = useState<number>(5);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newSocketId, setNewSocketId] = useState<SocketId>(1);
@@ -126,6 +128,38 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
   const isStorm = weather.condition === 'THUNDERSTORM';
   const isHeavyRain = weather.condition === 'HEAVY_RAIN';
   const maxSocketDailyKwh = Math.max(0.01, ...sockets.map((s) => s.dailyKwh));
+
+  // Build 6-day stacked bar dataset (5 history days + live Today bar)
+  const chartDays = [
+    ...dailyHistory,
+    {
+      dayLabel: 'Today',
+      s1Kwh: sockets[0]?.dailyKwh ?? 0,
+      s2Kwh: sockets[1]?.dailyKwh ?? 0,
+      s3Kwh: sockets[2]?.dailyKwh ?? 0,
+      s4Kwh: sockets[3]?.dailyKwh ?? 0,
+    },
+  ];
+  const rawMaxDailyTotal = Math.max(
+    1,
+    ...chartDays.map((d) => d.s1Kwh + d.s2Kwh + d.s3Kwh + d.s4Kwh)
+  );
+  const yStep =
+    rawMaxDailyTotal <= 6
+      ? 2
+      : rawMaxDailyTotal <= 12
+        ? 4
+        : rawMaxDailyTotal <= 18
+          ? 6
+          : Math.ceil(rawMaxDailyTotal / 3);
+  const yMax = yStep * 3;
+  const yTicks = [yMax, yStep * 2, yStep, 0];
+  const inspectedDay = chartDays[selectedDayIdx] ?? chartDays[chartDays.length - 1];
+  const inspectedTotal =
+    inspectedDay.s1Kwh +
+    inspectedDay.s2Kwh +
+    inspectedDay.s3Kwh +
+    inspectedDay.s4Kwh;
 
   const handleToggleDay = (dayIdx: number) => {
     setNewDays((prev) =>
@@ -153,9 +187,9 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-start">
-      {/* Sleek Modern Smartphone Bezel */}
-      <div className="relative w-full max-w-[360px] rounded-[40px] bg-[#F5F5F7] border-[8px] border-[#1D1D1F] shadow-xl overflow-hidden flex flex-col">
+    <div className="flex flex-col items-center justify-start w-full">
+      {/* Sleek Modern Smartphone Bezel (Fixed Height Across All Tabs) */}
+      <div className="relative h-[690px] w-full max-w-[390px] mx-auto rounded-[40px] bg-[#F5F5F7] border-[8px] border-[#1D1D1F] shadow-xl overflow-hidden flex flex-col">
         {/* Top Mobile / WhatsApp Push Notification Banner Overlay (z-30) */}
         {activeBanner && (
           <div
@@ -219,8 +253,8 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
           </div>
         )}
 
-        {/* Phone Status Bar + Dynamic Island */}
-        <div className="bg-white px-5 pt-3 pb-2 flex items-center justify-between border-b border-black/[0.05]">
+        {/* 1. Fixed Top Header (Status Bar + Dynamic Island) */}
+        <div className="shrink-0 bg-white px-5 pt-3 pb-2 flex items-center justify-between border-b border-black/[0.05]">
           <span className="font-mono text-[11px] font-semibold text-[#1D1D1F] tabular-nums">
             {clock.formattedTime.slice(0, 5)}
           </span>
@@ -231,11 +265,11 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
           </div>
         </div>
 
-        {/* Scrollable Screen Body (fixed height so Bottom Nav stays pinned) */}
-        <div className="flex-1 h-[475px] overflow-y-auto">
+        {/* 2. Scrollable Screen Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain phone-scroll">
           {/* TAB 1: DASHBOARD */}
           {activeTab === 'dashboard' && (
-            <div className="p-3.5 space-y-2.5">
+            <div className="px-4 py-3 space-y-2.5">
               {/* Extreme Weather Warning inside Phone */}
               {(isStorm || isHeavyRain) && (
                 <div
@@ -312,6 +346,162 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
                   </span>
                 </div>
               </button>
+
+              {/* Stacked Bar Chart: Daily Usage by Socket (kWh) */}
+              <div className="bg-white rounded-2xl p-3 border border-black/[0.06] space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-[#1D1D1F]">
+                    Daily Usage by Socket (kWh)
+                  </span>
+                  <span className="font-mono text-[10px] font-semibold text-[#047857] tabular-nums">
+                    {inspectedDay.dayLabel}: {inspectedTotal.toFixed(2)} kWh
+                  </span>
+                </div>
+
+                {/* Compact 4-Socket Legend */}
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[9px] font-medium text-[#424245]">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-xs bg-[#10B981]" />
+                    S1 Heater
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-xs bg-[#3B82F6]" />
+                    S2 AC
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-xs bg-[#F59E0B]" />
+                    S3 Dispenser
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-xs bg-[#6366F1]" />
+                    S4 Charger
+                  </span>
+                </div>
+
+                {/* Chart Plot Area: Y-Axis + 6 Stacked Bars */}
+                <div className="relative pt-1">
+                  <div className="flex items-stretch gap-1.5 h-[108px]">
+                    {/* Y-Axis Labels */}
+                    <div className="flex flex-col justify-between text-right pr-1 font-mono text-[9px] text-[#86868B] tabular-nums select-none pb-4">
+                      {yTicks.map((t) => (
+                        <span key={t} className="leading-none">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Gridlines & Bars Container */}
+                    <div className="relative flex-1 flex flex-col">
+                      <div className="relative flex-1 flex items-end justify-between gap-1.5 px-1">
+                        {/* Horizontal Grid Lines */}
+                        <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+                          {yTicks.map((t) => (
+                            <div
+                              key={t}
+                              className="w-full border-b border-[#E5E7EB]"
+                            />
+                          ))}
+                        </div>
+
+                        {/* Stacked Bars (Bottom-to-Top: S1 -> S2 -> S3 -> S4) */}
+                        {chartDays.map((day, idx) => {
+                          const total = day.s1Kwh + day.s2Kwh + day.s3Kwh + day.s4Kwh;
+                          const totalPct = Math.min(100, (total / yMax) * 100);
+                          const s1Pct = total > 0 ? (day.s1Kwh / total) * 100 : 0;
+                          const s2Pct = total > 0 ? (day.s2Kwh / total) * 100 : 0;
+                          const s3Pct = total > 0 ? (day.s3Kwh / total) * 100 : 0;
+                          const s4Pct = total > 0 ? (day.s4Kwh / total) * 100 : 0;
+                          const isSelected = idx === selectedDayIdx;
+
+                          return (
+                            <button
+                              key={`${day.dayLabel}-${idx}`}
+                              type="button"
+                              onClick={() => setSelectedDayIdx(idx)}
+                              onMouseEnter={() => setSelectedDayIdx(idx)}
+                              className="relative z-10 flex-1 h-full flex flex-col justify-end items-center group cursor-pointer focus:outline-none"
+                              aria-label={`${day.dayLabel}: ${total.toFixed(2)} kWh`}
+                            >
+                              <div
+                                className={`w-full max-w-[24px] flex flex-col-reverse rounded-t-sm overflow-hidden transition-all duration-300 ${
+                                  isSelected
+                                    ? 'ring-1 ring-[#1D1D1F] ring-offset-1'
+                                    : 'opacity-90 group-hover:opacity-100'
+                                }`}
+                                style={{ height: `${Math.max(2, totalPct)}%` }}
+                              >
+                                <div
+                                  className="w-full bg-[#10B981]"
+                                  style={{ height: `${s1Pct}%` }}
+                                />
+                                <div
+                                  className="w-full bg-[#3B82F6]"
+                                  style={{ height: `${s2Pct}%` }}
+                                />
+                                <div
+                                  className="w-full bg-[#F59E0B]"
+                                  style={{ height: `${s3Pct}%` }}
+                                />
+                                <div
+                                  className="w-full bg-[#6366F1]"
+                                  style={{ height: `${s4Pct}%` }}
+                                />
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* X-Axis Day Labels */}
+                      <div className="flex items-center justify-between gap-1.5 px-1 pt-1">
+                        {chartDays.map((day, idx) => {
+                          const isSelected = idx === selectedDayIdx;
+                          return (
+                            <span
+                              key={`lbl-${day.dayLabel}-${idx}`}
+                              className={`flex-1 text-center font-mono text-[9px] truncate ${
+                                isSelected
+                                  ? 'font-bold text-[#1D1D1F]'
+                                  : 'text-[#6E6E73]'
+                              }`}
+                            >
+                              {day.dayLabel}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selected Day Interactive Breakdown */}
+                <div className="grid grid-cols-4 gap-1 bg-[#F5F5F7] rounded-xl p-1.5 font-mono text-[9px] tabular-nums text-center">
+                  <div>
+                    <span className="text-[#047857] font-semibold block">S1</span>
+                    <span className="font-bold text-[#1D1D1F]">
+                      {inspectedDay.s1Kwh.toFixed(2)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#2563EB] font-semibold block">S2</span>
+                    <span className="font-bold text-[#1D1D1F]">
+                      {inspectedDay.s2Kwh.toFixed(2)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#D97706] font-semibold block">S3</span>
+                    <span className="font-bold text-[#1D1D1F]">
+                      {inspectedDay.s3Kwh.toFixed(2)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#4F46E5] font-semibold block">S4</span>
+                    <span className="font-bold text-[#1D1D1F]">
+                      {inspectedDay.s4Kwh.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
               {/* Today's Total Usage + Per-Socket Daily Breakdown */}
               <div className="bg-white rounded-2xl p-3 border border-black/[0.06] space-y-2">
@@ -455,13 +645,13 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
 
           {/* TAB 2: SOCKET (4 Independent Socket Cards) */}
           {activeTab === 'socket' && (
-            <div className="p-3.5 space-y-2.5">
-              <div className="flex items-center justify-between px-0.5">
+            <div className="px-4 py-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 px-0.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6E6E73]">
-                  4 Independent Sockets
+                  4 Sockets
                 </span>
-                <span className="font-mono text-[11px] font-semibold text-[#047857] tabular-nums">
-                  {totalPowerWatts.toLocaleString('en-US')} / 2,400 W
+                <span className="font-mono text-[10px] font-semibold text-[#047857] tabular-nums">
+                  {totalPowerWatts.toLocaleString('en-US')} W Total · Limit 2,400 W/Socket
                 </span>
               </div>
 
@@ -579,7 +769,7 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
 
           {/* TAB 3: SCHEDULE */}
           {activeTab === 'schedule' && (
-            <div className="p-3.5 space-y-3">
+            <div className="px-4 py-3 space-y-3">
               {/* Off-Peak Auto-On Toggle */}
               <div className="bg-white rounded-2xl p-3 border border-black/[0.06] flex items-center justify-between gap-2">
                 <div>
@@ -889,11 +1079,12 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
           )}
         </div>
 
-        {/* Permanent 4-Tab Bottom Navigation Bar */}
-        <nav
-          aria-label="Smartphone App Navigation"
-          className="bg-white border-t border-black/[0.08] px-2 pt-1.5 pb-1 grid grid-cols-4 gap-1"
-        >
+        {/* 3. Fixed Bottom Navigation Bar + Home Indicator */}
+        <div className="shrink-0 mt-auto bg-white border-t border-black/[0.08]">
+          <nav
+            aria-label="Smartphone App Navigation"
+            className="px-2 pt-1.5 pb-1 grid grid-cols-4 gap-1"
+          >
           <button
             type="button"
             onClick={() => setActiveTab('dashboard')}
@@ -959,11 +1150,12 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
             </div>
             <span className="text-[10px] font-semibold mt-0.5">WhatsApp</span>
           </button>
-        </nav>
+          </nav>
 
-        {/* Home Indicator Bar */}
-        <div className="py-1.5 flex justify-center bg-white">
-          <div className="w-24 h-1 rounded-full bg-[#1D1D1F]/20" />
+          {/* Home Indicator Bar */}
+          <div className="py-1.5 flex justify-center bg-white">
+            <div className="w-24 h-1 rounded-full bg-[#1D1D1F]/20" />
+          </div>
         </div>
       </div>
     </div>

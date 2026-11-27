@@ -158,14 +158,10 @@ export function HardwarePlugTwin({ engine }: HardwarePlugTwinProps) {
 
           <span
             className={`font-mono text-[11px] font-semibold tabular-nums ${
-              totalPowerWatts > 2100
-                ? 'text-[#D97706]'
-                : isDay
-                  ? 'text-[#1D1D1F]'
-                  : 'text-slate-200'
+              isDay ? 'text-[#1D1D1F]' : 'text-slate-200'
             }`}
           >
-            {totalPowerWatts.toLocaleString('en-US')} / 2,400 W
+            {totalPowerWatts.toLocaleString('en-US')} W Total · Max 2,400 W/Socket
           </span>
         </div>
 

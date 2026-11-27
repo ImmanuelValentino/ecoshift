@@ -77,6 +77,9 @@ When plug temperature enters `Warm (56°C to 69°C)` or `Overheat (>= 70°C)`, t
 
 ## 5. Companion Smartphone Frame and WhatsApp Mockup (Center Column)
 
-* Styled as a clean modern smartphone (`max-w-[340px] mx-auto rounded-[40px] bg-[#F5F5F7] border-[8px] border-[#1D1D1F] shadow-xl`):
+* Styled as a fixed-height modern smartphone (`h-[690px] w-full max-w-[390px] mx-auto rounded-[40px] bg-[#F5F5F7] border-[8px] border-[#1D1D1F] shadow-xl overflow-hidden flex flex-col`) so the bezel height stays identical across all 4 tabs:
+  * **Fixed Top Header (`shrink-0`):** Status bar and Dynamic Island pinned at the top.
+  * **Scrollable Content Body (`flex-1 min-h-0 overflow-y-auto overscroll-contain`):** Smooth internal scrolling with a thin custom scrollbar for `Dashboard` (including the **Daily Usage by Socket (kWh)** stacked bar chart with `S1 Heater` `#10B981`, `S2 AC` `#3B82F6`, `S3 Dispenser` `#F59E0B`, and `S4 Charger` `#6366F1` legend and interactive day breakdown), `Socket` (all 4 socket cards), `Schedule`, and `WhatsApp` chat history.
+  * **Fixed Bottom Navigation Bar (`shrink-0 mt-auto`):** Permanent 4-tab bar (`Dashboard`, `Socket` with active count badge, `Schedule`, `WhatsApp` with unread badge) locked at the bottom of the screen.
   * **Top Mobile Push Notification Banner:** Slides down over the top of the phone screen (`z-30`) for safety trips, thermal overheat, and extreme weather WhatsApp alerts, with vector icon, sender label (`WhatsApp: EcoShift Guard` or `EcoShift Alert`), concise sensor reading, and timestamp.
   * **App Mode Switcher:** Clean Apple segmented control toggling between **Controls** (Smart Plug Control, Temperature Status, Timer, Off-Peak Auto-On, Schedules) and **WhatsApp** (Virtual WhatsApp chat view with **EcoShift Guard** official verified badge, unread counter, and structured alert bubbles showing Event Type, Voltage `V`, Temperature `°C`, Power `W`, Simulation Time, and Action Status).

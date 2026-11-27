@@ -49,6 +49,14 @@ export interface SocketState {
   remainingCutoffSeconds: number | null;
 }
 
+export interface DailyUsageRecord {
+  dayLabel: string;
+  s1Kwh: number;
+  s2Kwh: number;
+  s3Kwh: number;
+  s4Kwh: number;
+}
+
 export type RelayState = 'ON' | 'OFF' | 'TRIPPED';
 
 export type SpeedMultiplier = 0 | 1 | 60 | 300 | 1800;

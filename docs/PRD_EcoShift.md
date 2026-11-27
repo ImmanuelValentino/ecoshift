@@ -25,7 +25,7 @@ This web application serves as a **live interactive pitch platform** for an **In
   2. **Socket 2:** `Air Conditioner (AC)` (`900 W`)
   3. **Socket 3:** `Water Dispenser` (`350 W`)
   4. **Socket 4:** `Laptop Charger` (`65 W`)
-* **Smartphone Mockup with 4-Tab Bottom Navigation Bar:** `Dashboard` (Active Sockets summary, Today's kWh + per-socket breakdown, 30-Day Monthly Bill, Adaptive Off-Peak card, Live Telemetry), `Socket` (4 independent socket cards with ON/OFF toggle, active session duration, session kWh, and optional per-socket auto-cutoff timer), `Schedule` (daily schedules bound to `Socket 1`–`4` + Off-Peak Auto-On), and `WhatsApp` (`EcoShift Guard` alerts).
+* **Smartphone Mockup with 4-Tab Bottom Navigation Bar:** `Dashboard` (Active Sockets summary, **Daily Usage by Socket (kWh)** interactive 6-day stacked bar chart with live `Today` bar and automatic `00:00` day rollover, Today's kWh + per-socket breakdown, 30-Day Monthly Bill, Adaptive Off-Peak card, Live Telemetry), `Socket` (4 independent socket cards with ON/OFF toggle, active session duration, session kWh, and optional per-socket auto-cutoff timer), `Schedule` (daily schedules bound to `Socket 1`–`4` + Off-Peak Auto-On), and `WhatsApp` (`EcoShift Guard` alerts).
 * **Core Smart Plug Features:**
   1. **Auto-On and Auto-Cutoff:** Rule-based relay control (Auto-On via Daily Schedule or Off-Peak Hour entry; Auto-Cutoff via Countdown Timer, Overload, Voltage Anomaly, or Thermal Overheat).
   2. **Daily On/Off Scheduling:** Multi-slot schedule configuration across days of the week (`Monday to Sunday`).
@@ -99,11 +99,11 @@ The smart plug relay is governed by deterministic automation rules in strict pri
   * **Undervoltage (`< 198 V`):** Immediate Relay OFF (`TRIPPED`), anomaly log entry, and WhatsApp notification.
   * **Overvoltage (`> 242 V`):** Immediate Relay OFF (`TRIPPED`), anomaly log entry, and WhatsApp notification.
 * **Socket Capacity and Thermal Standard (SNI IEC 60884-1):**
-  * Socket rated capacity: `2,400 W to 2,500 W` (`10A / 250V`). Overload trip threshold: `> 2,400 W`.
+  * Socket rated capacity: `2,400 W to 2,500 W` (`10A / 250V`) **per individual socket**. Running all 4 standard appliances simultaneously (`2,815 W` total across 4 independent sockets) operates normally without triggering overload; overload trips only when a single socket exceeds `> 2,400 W`, cutting off only the affected socket.
   * Maximum terminal temperature rise: `45 K` above ambient (`~25°C to 28°C`), keeping safe surface/insulation temperature strictly below `70°C` (critical threshold `70°C to 85°C`).
   * **Thermal Status Bands:**
     * `Normal`: `28°C to 55°C`
-    * `Warm` (Advisory): `56°C to 69°C`
+    * `Warm` (Advisory): `56°C to 69°C` (running all 4 standard appliances simultaneously stabilizes safely within `35°C to 58°C`)
     * `Overheat` (Danger `>= 70°C`): Immediate Relay OFF (`TRIPPED`), anomaly log entry, and WhatsApp notification.
   * **Realistic Thermal Simulation:** Plug temperature rises gradually when high-power loads (`Water Heater`, `AC`) run continuously, cools down toward ambient (`28°C`) when the relay is `OFF` or under light load, and includes an instant **`Simulate Overheat (>70°C)`** preset trigger.
 * **WhatsApp Virtual Mockup (`EcoShift Guard`):**
