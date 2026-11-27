@@ -50,16 +50,20 @@ When plug temperature enters `Warm (56°C to 69°C)` or `Overheat (>= 70°C)`, t
 
 ## 4. Page Layout and Information Architecture
 
-### 4.1 Vertical Page Flow
-1. **Minimalist Sticky Header (`bg-white/80 backdrop-blur-md border-b border-black/5`):**
-   * Left: `EcoShift Home` wordmark with clean geometric leaf-bolt SVG mark.
-   * Center: Smooth-scroll links (`Overview`, `How It Works`, `Interactive Simulator`, `Sustainability BMC`).
+### 4.1 Vertical Page Flow (3-Section Full-Page Scroll Snap)
+1. **Fixed Minimalist Header (`fixed top-0 bg-white/85 backdrop-blur-md border-b border-black/5`):**
+   * Left: `EcoShift` wordmark with clean geometric leaf-bolt SVG mark.
+   * Center: Smooth-scroll links (`Home`, `Product`, `Live Simulator`) with active section highlight.
    * Right: Active Country Regulation pill and solid pill CTA button (`Try Live Simulator`).
-2. **Hero Section (Pure White `#FFFFFF` Canvas):**
-   * Eyebrow label, large headline, value statement, three SDG alignment pills, and primary CTA button.
-3. **Problem and Three-Step Solution (Apple Bento Grid on `#FFFFFF` with `#F5F5F7` Cards):**
-   * Highlights Peak-Hour Grid Congestion, Unstable Residential Voltage & Thermal Overload (`<198V`, `>242V`, `>=70°C`), and Forgotten Appliance Runtime.
-4. **Interactive Web Simulator Workbench (Full-Width Bento Container `#F5F5F7`):**
+   * Right-edge minimalist dot navigation (`Home`, `Product`, `Live Simulator`) on `xl` screens.
+2. **Section 1: Home / Hero (100vh Split Screen on `#FFFFFF`):**
+   * Left column: `EcoShift` headline, `Power, Perfected. Protection, Instant.` tagline, concise description, and single `Try Live Simulator` button.
+   * Right column: Interactive 360-degree **Three.js 3D Smart Socket** (`EcoShift3DSocket.tsx`) with matte white body, Type-F socket cavity, brass contacts, grounding clips, glowing emerald LED ring, side power button, rear prongs, soft studio shadow, and `Drag to rotate 360°` hint.
+3. **Section 2: Product & Usage Overview (100vh on `#FFFFFF` with `#F5F5F7` Cards):**
+   * Headline: `Built for Everyday Appliances. Engineered for Safety.`
+   * Part A: 3 compact feature cards (`Smart Daily Scheduling`, `Instant Anomaly Cutoff`, `Real-Time Energy & WhatsApp Alerts`).
+   * Part B: 3 horizontal usage steps (`01. Plug In`, `02. Set Schedule & Limits`, `03. Monitor & Control`).
+4. **Section 3: Interactive Web Simulator Workbench (Full-Width Bento Container `#F5F5F7` + Footer):**
    * **Top Control Strip (`#FFFFFF` rounded bar):**
      * Virtual Clock + Speed Selector (`Pause`, `1x`, `60x`, `300x`, `1800x`) + Quick Time Jump buttons (`07:30`, `13:00`, `19:30`, `23:05`).
      * Fault and Thermal Test Triggers (`Undervoltage 176V`, `Overvoltage 265V`, `Overload 2,480W`, `Simulate Overheat (>70°C)`, `Restore Normal`).
@@ -67,13 +71,12 @@ When plug temperature enters `Warm (56°C to 69°C)` or `Overheat (>= 70°C)`, t
    * **Extreme Weather Warning Banner:** Appears cleanly above the 3-column workspace whenever `Heavy Rain` or `Thunderstorm` is active, showing lightning/surge protection standby status.
    * **Three-Column Interactive Workspace (`w-full max-w-[1720px]` container, `grid-cols-1 lg:grid-cols-[1.15fr_390px_1.15fr] xl:grid-cols-[1.2fr_410px_1.2fr] gap-5`):**
      * **Left Column (`1.15fr` / `1.2fr`): Compact 4-Socket Hardware Stage (No-Scroll on Laptop)** (Day/Night room, 4-socket smart power strip with reduced thermal glow & live `°C` pill, animated cables, 4 fixed appliances `S1–S4`, and tap-to-toggle relay).
-     * **Center Column (`390px` / `410px`): Companion Smartphone App with 4-Tab Bottom Navigation Bar** (Top WhatsApp/Alert push banner, permanent Bottom Navigation Bar with `Dashboard`, `Socket` + active badge, `Schedule`, and `WhatsApp` + unread badge).
-     * **Right Column (`1.15fr` / `1.2fr`): Country Tariff, Aggregate Telemetry and Impact** (Country selector, live voltage sparkline with `198V–231V` safe band and `232V–242V` warning band, Voltage/Total Amp/Total Load/Plug Temp tiles, 4-socket daily kWh breakdown, monthly bill bar, off-peak savings, carbon reduction, and anomaly log).
-5. **Sustainability Business Model Canvas (BMC) Grid (`#FFFFFF` Section, `w-full max-w-[1600px]`):**
-   * Clean 6-card Apple-style bento grid without unit pricing.
-6. **Layout Alignment & Overflow Prevention:**
+     * **Center Column (`390px` / `410px`): Companion Smartphone App with 4-Tab Bottom Navigation Bar** (Top WhatsApp/Alert push banner, wheel-isolated scrollable screen body, permanent Bottom Navigation Bar with `Dashboard`, `Socket` + active badge, `Schedule`, and `WhatsApp` + unread badge).
+     * **Right Column (`1.15fr` / `1.2fr`): Country Tariff, Aggregate Telemetry and Impact** (Country selector, live voltage sparkline with `198V–231V` safe band and `232V–242V` warning band, Voltage/Total Amp/Total Load/Plug Temp tiles, 4-socket daily kWh breakdown, synchronized Weekly/Monthly bill bar, off-peak savings, carbon reduction, and anomaly log).
+5. **Layout Alignment & Scroll-Snap Behavior:**
    * Navbar, Footer, and Simulator Workbench share `w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8` for crisp edge-to-edge alignment across `1280px`, `1440px`, and `1920px` viewports.
-   * Pitch sections (`HeroSection`, `ProblemSolutionSection`, `SustainabilityBmcSection`) use `w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8`, and the root container enforces `overflow-x-hidden`.
+   * Home and Product sections use `w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8` inside an `h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth` scroll container.
+   * Internal `wheel` listener on the smartphone screen prevents scroll chaining so scrolling inside the phone never triggers page section snap.
 
 ## 5. Companion Smartphone Frame and WhatsApp Mockup (Center Column)
 

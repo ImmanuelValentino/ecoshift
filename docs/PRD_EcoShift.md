@@ -3,23 +3,26 @@
 
 | Metadata | Detail |
 | :--- | :--- |
-| **Product Name** | EcoShift Home (4-Socket Independent Smart Power Strip Simulator) |
-| **Document Version** | 3.0 |
-| **Target Audience** | International Sustainability Business Model Canvas (BMC) Competition Judges |
-| **Website Format** | Pitch Landing Page + Embedded Interactive Web Simulator |
-| **System Architecture** | Client-Side Interactive Web Simulator with Optional Google Weather API Integration |
-| **Primary Language** | English (International Competition Standard) |
+| **Product Name** | EcoShift (4-Socket Smart Plug Product Showcase & Simulator) |
+| **Document Version** | 4.0 |
+| **Target Audience** | Product Evaluation & Smart Home Energy Users |
+| **Website Format** | 3-Section Full-Page Scroll-Snap Product Showcase + Embedded Interactive Web Simulator |
+| **System Architecture** | Client-Side Interactive Web Simulator with Three.js 3D Product View & Optional Google Weather API |
+| **Primary Language** | English (International Product Standard) |
 
 ## 1. Executive Summary and Product Vision
 
-**EcoShift Home** is a plug-and-play single-socket smart plug solution designed to help urban households shift high-power appliance usage to off-peak hours, automate daily power schedules, protect electronics from electrical grid anomalies and thermal overheating, monitor extreme weather surge risks, and reduce household carbon footprints.
+**EcoShift** is a plug-and-play smart plug solution designed to schedule everyday household appliances, shift heavy loads to off-peak hours, protect electronics from voltage and thermal anomalies in milliseconds, and monitor extreme weather surge risks.
 
-This web application serves as a **live interactive pitch platform** for an **International Sustainability Business Model Canvas (BMC)** competition. Rather than relying on static slides, the website combines a compelling sustainability pitch narrative with a real-time, self-contained **Interactive Web Simulator**—allowing judges to manipulate virtual time, observe day/night environmental transitions, schedule appliances, inject electrical grid or thermal anomalies, test extreme weather alerts, and inspect country-specific monthly electricity bills and off-peak savings.
+This web application combines a clean Apple/Samsung-inspired **3-Section Product Launch Experience** (with an interactive **Three.js 3D Smart Socket**) and a self-contained **4-Socket Interactive Web Simulator** with full-page scroll-snap navigation.
 
 ## 2. Product Scope and Strict Guardrails
 
 ### 2.1 In-Scope (Must Build)
-* **Pitch Landing Page:** Narrative sections tailored for international sustainability judges (Hero, Problem/Grid Challenge, 3-Step Solution, Live Interactive Simulator, and Sustainability BMC Overview).
+* **3-Section Full-Page Scroll-Snap Website:**
+  1. **Section 1 (`Home`):** 100vh split-screen Hero featuring **EcoShift** (`Power, Perfected. Protection, Instant.`), a single `Try Live Simulator` CTA, and an interactive 360-degree **Three.js 3D Smart Socket** (`EcoShift3DSocket.tsx`).
+  2. **Section 2 (`Product & How It Works`):** Concise 100vh product overview (`Built for Everyday Appliances. Engineered for Safety.`) with 3 core product feature cards (`Smart Daily Scheduling`, `Instant Anomaly Cutoff`, `Real-Time Energy & WhatsApp Alerts`) and 3 usage steps (`01. Plug In`, `02. Set Schedule & Limits`, `03. Monitor & Control`).
+  3. **Section 3 (`Live Simulator`):** Full-width 3-column interactive simulator workbench plus footer.
 * **4-Socket Independent Hardware Twin (`Socket 1` to `Socket 4`):** Visual and logical simulation of **4 independent smart sockets**, each permanently paired with 1 household appliance:
   1. **Socket 1:** `Water Heater` (`1,500 W`)
   2. **Socket 2:** `Air Conditioner (AC)` (`900 W`)
@@ -43,27 +46,25 @@ This web application serves as a **live interactive pitch platform** for an **In
 * **No AI Autonomous Load Shifting:** Scheduling must be explicit and deterministic (user-configured daily schedules and off-peak auto-on triggers).
 * **No Gamification / Eco-Reward Points:** Completely exclude Eco-Points, point balances, badges, or voucher redemption tabs.
 
-## 3. Pitch Landing Page Structure
+## 3. Website Section Structure (Full-Page Scroll Snap)
 
-The landing page flows seamlessly from executive storytelling into hands-on demonstration:
-
-1. **Top Navigation Bar:**
-   * Brand identity (`EcoShift Home`), anchor links (`Overview`, `How It Works`, `Live Simulator`, `Sustainability BMC`), active Country Tariff indicator, and a primary CTA button (`Launch Live Demo`).
-2. **Hero Section (Pitch Opening):**
-   * Headline: *"Shift Peak Loads. Protect Appliances. Decarbonize Every Home."*
-   * Subheadline explaining how a single smart plug bridges household energy automation with national grid decarbonization.
-   * Alignment badges for **UN Sustainable Development Goals (SDGs)**: `SDG 7 (Affordable & Clean Energy)`, `SDG 12 (Responsible Consumption)`, and `SDG 13 (Climate Action)`.
-3. **Problem and Sustainability Opportunity:**
-   * Visual breakdown of peak-hour grid congestion (fossil-fuel peaker plant reliance), unstable residential voltage and thermal overload damaging appliances, and forgotten appliance runtime.
-4. **Interactive Web Simulator (Core Centerpiece):**
+1. **Fixed Minimalist Top Navigation Bar:**
+   * Brand identity (`EcoShift`), active-state navigation links (`Home`, `Product`, `Live Simulator`), active Country Tariff indicator, and a primary CTA button (`Try Live Simulator`).
+   * Paired with a minimalist right-side dot navigation indicator for quick section jumping.
+2. **Section 1 (`Home` — 100vh Split Screen):**
+   * Left column: `EcoShift` display title, tagline (`Power, Perfected. Protection, Instant.`), concise sub-tagline, and `Try Live Simulator` CTA.
+   * Right column: Interactive 360-degree Three.js 3D Smart Socket (`RoundedBoxGeometry` matte white body, Type-F front socket well with brass contacts and grounding clips, glowing emerald LED ring, side power button, rear metal prongs, soft studio shadow, and `Drag to rotate 360°` hint).
+3. **Section 2 (`Product` — 100vh Overview):**
+   * Title: `Built for Everyday Appliances. Engineered for Safety.`
+   * Part A (3 Core Features): `Smart Daily Scheduling`, `Instant Anomaly Cutoff`, `Real-Time Energy & WhatsApp Alerts`.
+   * Part B (3 Usage Steps): `01. Plug In`, `02. Set Schedule & Limits`, `03. Monitor & Control`.
+4. **Section 3 (`Live Simulator`):**
    * Full-width interactive command center containing:
      * **Demo Scenario Control Bar** (Time Speed, Time Jump, Grid Fault and Overheat Triggers, Weather Mode Controls, Reset).
      * **Extreme Weather Alert Banner** (rendered when `Heavy Rain` or `Thunderstorm` is active).
-     * **Left Panel:** Dynamic Day/Night Room Scene + 1-Socket Smart Plug Hardware Twin with live thermal readout (`°C`) + Appliance Selector.
-     * **Center Panel:** Interactive Smartphone Companion App Frame with **Controls** tab, **WhatsApp (EcoShift Guard)** tab, and top WhatsApp/Alert notification banner overlay.
-     * **Right Panel:** Country Tariff Selector, Real-Time Electrical and Thermal Telemetry, Monthly Bill Forecast (Peak vs. Off-Peak), Off-Peak Savings, Carbon Reduction, and Anomaly Log.
-5. **Sustainability Business Model Canvas (BMC) Highlights:**
-   * Clean, judge-ready summary cards presenting the **Value Proposition**, **Customer Segments**, **Key Activities & Resources**, **Key Partners**, **Channels**, and **Environmental and Social Impact Metrics** (without unit pricing clutter).
+     * **Left Panel:** Dynamic Day/Night Compact 4-Socket Hardware Strip with live thermal readout (`°C`) and tap-to-toggle sockets.
+     * **Center Panel:** Fixed-height Smartphone Companion App Frame with 4-Tab Bottom Navigation Bar (`Dashboard`, `Socket`, `Schedule`, `WhatsApp`) and top push notification banner.
+     * **Right Panel:** Country Tariff Selector, Real-Time Electrical and Thermal Telemetry, Synchronized Period Bill Forecast (`Weekly`/`Monthly`), Off-Peak Savings / Tarif Flat (PLN), Carbon Reduction, and Anomaly Log.
 
 ## 4. Detailed Functional Requirements
 

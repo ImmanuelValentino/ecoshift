@@ -16,7 +16,10 @@ export function SimulatorWorkbench({ engine }: SimulatorWorkbenchProps) {
   const showWeatherBanner = isStorm || isHeavyRain;
 
   return (
-    <section id="simulator" className="py-16 sm:py-24 bg-white scroll-mt-20">
+    <section
+      id="simulator"
+      className="min-h-screen pt-20 pb-12 sm:pt-24 sm:pb-16 bg-white"
+    >
       <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Heading */}
         <div className="max-w-3xl mb-10">

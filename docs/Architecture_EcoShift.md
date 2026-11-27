@@ -7,9 +7,10 @@
 * **Resilient Offline-First Fallback:** All tariff rules, grid carbon intensities, appliance profiles, thermal physics, virtual clock ticks, and WhatsApp mockup notifications run locally in browser memory. Weather lookup uses `VITE_GOOGLE_WEATHER_API_KEY` when configured and falls back cleanly to local weather simulation when offline or unconfigured.
 * **Tech Stack:**
   * **Framework:** React 19 with TypeScript (`Vite` build tool)
+  * **3D Rendering:** `three` (`WebGLRenderer`, `RoundedBoxGeometry`, `OrbitControls`) with deterministic WebGL geometry/material/renderer disposal on unmount
   * **Styling:** Tailwind CSS v4
   * **Icons:** `lucide-react`
-  * **Charts/Sparklines:** Custom lightweight responsive SVG components
+  * **Charts/Sparklines:** Custom lightweight responsive SVG and CSS Flexbox components
 
 ## 2. System Data Flow
 
@@ -114,9 +115,9 @@ ecoshift/
         │   ├── Navbar.tsx
         │   └── Footer.tsx
         ├── pitch/
-        │   ├── HeroSection.tsx
-        │   ├── ProblemSolutionSection.tsx
-        │   └── SustainabilityBmcSection.tsx
+        │   ├── EcoShift3DSocket.tsx     # Three.js interactive 360-degree 3D smart socket
+        │   ├── HeroSection.tsx          # 100vh split-screen Home showcase + 3D socket
+        │   └── ProblemSolutionSection.tsx # 100vh Product features & 3-step usage guide
         └── simulator/
             ├── SimulatorWorkbench.tsx   # 3-Column container + Weather banner + Control Bar
             ├── DemoControlBar.tsx       # Speed, Time Jump, Fault/Overheat, Weather Controls

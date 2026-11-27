@@ -109,6 +109,25 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
   const [pinnedBarIdx, setPinnedBarIdx] = useState<number | null>(null);
   const [hoveredBarIdx, setHoveredBarIdx] = useState<number | null>(null);
   const chartCardRef = useRef<HTMLDivElement | null>(null);
+  const phoneScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = phoneScrollRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.stopPropagation();
+      const atTop = el.scrollTop <= 0 && e.deltaY < 0;
+      const atBottom =
+        el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && e.deltaY > 0;
+      if (atTop || atBottom || el.scrollHeight <= el.clientHeight) {
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, []);
 
   useEffect(() => {
     setPinnedBarIdx(null);
@@ -287,7 +306,10 @@ export function SmartphoneAppFrame({ engine }: SmartphoneAppFrameProps) {
         </div>
 
         {/* 2. Scrollable Screen Body */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain phone-scroll">
+        <div
+          ref={phoneScrollRef}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain phone-scroll"
+        >
           {/* TAB 1: DASHBOARD */}
           {activeTab === 'dashboard' && (
             <div className="px-4 py-3 space-y-2.5">
